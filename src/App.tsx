@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Zap, Activity, Power, List, Sliders, Music, Circle
+  Play, Square, Zap, Power, List, Sliders, Music, Circle
 } from 'lucide-react'
 import './App.css'
 
@@ -64,7 +64,6 @@ function App() {
     instruments.current.snare = new Tone.NoiseSynth({ volume: -6 }).connect(masterReverb);
     instruments.current.hihat = new Tone.MetalSynth({ volume: -12 }).connect(masterReverb);
     
-    // POLYPHONIC BASS & LEAD
     instruments.current.bass = new Tone.PolySynth(Tone.MonoSynth).connect(masterReverb);
     instruments.current.lead = new Tone.PolySynth(Tone.Synth).connect(masterReverb);
 
@@ -86,7 +85,6 @@ function App() {
     instruments.current.lead?.triggerAttack(n);
     setPressedKeys(prev => new Set(prev).add(note));
 
-    // LIVE RECORD LOGIC
     if (isRecording && currentStep >= 0) {
       setGrid(prev => {
         const newGrid = { ...prev };
@@ -130,9 +128,11 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, currentGrid: grid, mode: 'daw' }),
       });
-      const data = await response.json();
+      const data = await res.json();
       if (data.newGrid) setGrid(data.newGrid);
-    } catch(e) {} finally {
+    } catch(e) {
+      console.error(e);
+    } finally {
       setIsGenerating(false);
       setPrompt("");
     }
