@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Volume2, VolumeX, Zap, Radio, AlertCircle, Terminal, Power
+  Play, Square, Zap, Radio, AlertCircle, Terminal, Power
 } from 'lucide-react'
 import './App.css'
 
@@ -19,23 +19,17 @@ window.dinoChannels = {};
 window.dinoTriggers = {};
 window.dinoLoops = {};
 
-// 1. Kick Setup
 const kickChan = new Tone.Channel().toDestination();
 const kick = new Tone.MembraneSynth().connect(kickChan);
 window.dinoChannels.kick = kickChan;
 
-window.dinoLoops.kick = new Tone.Loop(t => {
-  kick.triggerAttackRelease("C1", "8n", t);
-}, "4n").start(0);
+window.dinoLoops.kick = new Tone.Loop(t => kick.triggerAttackRelease("C1", "8n", t), "4n").start(0);
 
-// 2. Synth Setup
 const synthChan = new Tone.Channel().toDestination();
 const synth = new Tone.PolySynth().connect(synthChan);
 window.dinoChannels.synth = synthChan;
 
-window.dinoLoops.synth = new Tone.Loop(t => {
-  synth.triggerAttackRelease(["E3", "G3"], "16n", t);
-}, "2n").start(0.2);
+window.dinoLoops.synth = new Tone.Loop(t => synth.triggerAttackRelease(["E3", "G3"], "16n", t), "2n").start(0.2);
 
 Tone.getTransport().bpm.value = 124;
 Tone.getTransport().start();
@@ -83,14 +77,11 @@ function App() {
   const executeCode = async (codeToRun: string) => {
     setErrorLog(null);
     try {
-      // ANTI-CLICK: Ramp down volume before reset
       Tone.getDestination().volume.rampTo(-Infinity, 0.05);
       
       setTimeout(() => {
         Tone.getTransport().stop();
         Tone.getTransport().cancel();
-        
-        // Pulizia totale
         if (window.dinoLoops) Object.values(window.dinoLoops).forEach((l: any) => l.dispose());
         window.dinoChannels = {};
         window.dinoTriggers = {};
@@ -99,7 +90,6 @@ function App() {
         const func = new Function('Tone', codeToRun);
         func(Tone);
         
-        // ANTI-CLICK: Ramp up volume after new setup
         Tone.getDestination().volume.rampTo(0, 0.1);
         setTimeout(syncUI, 200);
       }, 60);
@@ -138,7 +128,7 @@ function App() {
       const data = await response.json();
       if (data.code) {
         const userMsg: Message = { role: 'user', content: currentPrompt };
-        const assistantMsg: Message = { role: 'assistant', content: "Sistema aggiornato con gestione loop dinamica." };
+        const assistantMsg: Message = { role: 'assistant', content: "OK" };
         setHistory(prev => [...prev, userMsg, assistantMsg].slice(-6));
         setCode(data.code);
         await executeCode(data.code);
@@ -169,7 +159,6 @@ function App() {
         <div className="status-dot pulse" />
       </header>
 
-      {/* Mixer Loops con ON/OFF REALE */}
       <div className="rack">
         <div className="rack-label">Sequencer Status</div>
         <div className="mixer-scroll">
@@ -197,7 +186,7 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Comando (es. 'Aggiungi loop basso', 'Crea trigger snare')"
+            placeholder="Evolvi sistema..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
@@ -215,7 +204,7 @@ function App() {
 
       <section className="panel code-preview-panel">
         <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Terminal size={12} /> Source Output</div>
+          <div className="panel-title"><Terminal size={12} /> Kernell Source Output</div>
         </div>
         {isCodeOpen && (
           <textarea 
