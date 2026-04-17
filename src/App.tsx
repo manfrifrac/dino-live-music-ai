@@ -46,7 +46,6 @@ function App() {
   const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // States per Mixer & Trigger
   const [loopTracks, setLoopTracks] = useState<string[]>([]);
   const [triggerSuoni, setTriggerSuoni] = useState<string[]>([]);
   const [mutedLoops, setMutedLoops] = useState<{ [key: string]: boolean }>({});
@@ -95,9 +94,13 @@ function App() {
     if (channel) {
       const isMuted = !mutedLoops[name];
       channel.mute = isMuted;
-      setMutedLoops(prev => ({ ...prev, [name]: isMuted }));
+      setMutedTracks(name, isMuted);
     }
   };
+
+  const setMutedTracks = (name: string, isMuted: boolean) => {
+    setMutedLoops(prev => ({ ...prev, [name]: isMuted }));
+  }
 
   const fireTrigger = (name: string) => {
     const triggerFunc = window.dinoTriggers?.[name];
@@ -118,7 +121,11 @@ function App() {
       });
       const data = await response.json();
       if (data.code) {
-        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "OK" }].slice(-6));
+        const newMsgs: Message[] = [
+          { role: 'user', content: currentPrompt },
+          { role: 'assistant', content: "OK" }
+        ];
+        setHistory(prev => [...prev, ...newMsgs].slice(-6));
         setCode(data.code);
         await executeCode(data.code);
       }
@@ -151,7 +158,6 @@ function App() {
         </div>
       </header>
 
-      {/* RACK PERFORMANCE */}
       <div className="rack">
         <div className="rack-label"><Radio size={10} /> Mixer Loop</div>
         <div className="mixer-scroll">
@@ -178,13 +184,13 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Aggiungi un loop o un trigger (es. 'Crea un trigger per un colpo di basso acido')"
+            placeholder="Evolvi la performance..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "SINCRONIZZAZIONE..." : "EVOLVI PERFORMANCE"}
+              {isGenerating ? "SYCHING..." : "EVOLVI PERFORMANCE"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={18} /></button>
             <button className="btn-icon" style={{ borderColor: '#ff3131', color: '#ff3131' }} onClick={() => Tone.getTransport().stop()}>
