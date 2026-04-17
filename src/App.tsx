@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, ChevronDown, ChevronUp, 
-  Code2, Volume2, VolumeX, RefreshCcw, AlertTriangle, CheckCircle2
+  Play, Square, Code2, Volume2, VolumeX, RefreshCcw, AlertTriangle, CheckCircle2
 } from 'lucide-react'
 import './App.css'
 
@@ -69,7 +68,6 @@ function App() {
   const startAudioEngine = async () => {
     await Tone.start();
     setIsAudioStarted(true);
-    console.log("Audio Engine Started");
     executeCode(codeRef.current);
   };
 
@@ -88,7 +86,7 @@ function App() {
       setIsPlaying(true);
     } catch (err: any) {
       console.error(err);
-      setErrorLog(err.message || "Errore sconosciuto nel codice");
+      setErrorLog(err.message || "Errore nel codice");
     }
   };
 
@@ -120,16 +118,14 @@ function App() {
       
       const data = await response.json();
       if (data.code) {
-        const newMsgs: Message[] = [
-          { role: 'user', content: currentPrompt },
-          { role: 'assistant', content: "OK" }
-        ];
-        setHistory(prev => [...prev, ...newMsgs].slice(-10));
+        const assistantMsg: Message = { role: 'assistant', content: "OK" };
+        const userMsg: Message = { role: 'user', content: currentPrompt };
+        setHistory(prev => [...prev, userMsg, assistantMsg].slice(-10));
         setCode(data.code);
         await executeCode(data.code);
       }
     } catch (err) {
-      setErrorLog("Errore connessione IA");
+      setErrorLog("Errore AI");
     } finally {
       setIsGenerating(false);
     }
@@ -137,45 +133,44 @@ function App() {
 
   return (
     <div className="app-shell">
-      {!isAudioStarted && (
-        <div className="overlay" onClick={startAudioEngine}>
+      <AnimatePresence>
+        {!isAudioStarted && (
           <motion.div 
-            initial={{ scale: 0.8 }} 
-            animate={{ scale: 1 }} 
-            className="start-card"
+            className="overlay" 
+            exit={{ opacity: 0 }}
+            onClick={startAudioEngine}
           >
-            <Play size={48} />
-            <h2>ATTIVA NUCLEO AUDIO</h2>
-            <p>Clicca per sbloccare l'ambiente musicale</p>
+            <motion.div 
+              initial={{ scale: 0.8 }} animate={{ scale: 1 }} 
+              className="start-card"
+            >
+              <Play size={48} />
+              <h2>AVVIA NUCLEO AUDIO</h2>
+              <p>Clicca per sbloccare l'app</p>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       <header>
-        <div className="brand">DINO.OS v3</div>
+        <div className="brand">DINO.OS</div>
         <div className="status-icons">
           {errorLog ? <AlertTriangle color="#ff3e3e" size={16} /> : <CheckCircle2 color="#00ff41" size={16} />}
-          <span style={{ fontSize: '0.6rem' }}>{errorLog ? 'ERRORE' : 'ONLINE'}</span>
         </div>
       </header>
 
-      {/* Mixer */}
       <div className="mixer-container">
-        {tracks.length === 0 ? (
-          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Canali non rilevati</div>
-        ) : (
-          tracks.map(track => (
-            <motion.div 
-              key={track}
-              whileTap={{ scale: 0.95 }}
-              className={`track-btn ${mutedTracks[track] ? 'muted' : 'active'}`}
-              onClick={() => toggleMute(track)}
-            >
-              {mutedTracks[track] ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              <div className="track-name">{track}</div>
-            </motion.div>
-          ))
-        )}
+        {tracks.map(track => (
+          <motion.div 
+            key={track}
+            whileTap={{ scale: 0.95 }}
+            className={`track-btn ${mutedTracks[track] ? 'muted' : 'active'}`}
+            onClick={() => toggleMute(track)}
+          >
+            {mutedTracks[track] ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            <div className="track-name">{track}</div>
+          </motion.div>
+        ))}
       </div>
 
       <section className="panel prompt-panel">
@@ -187,13 +182,13 @@ function App() {
           )}
           <textarea
             className="main-prompt"
-            placeholder="Chiedi all'IA di comporre..."
+            placeholder="Chiedi all'IA..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "SYNCING..." : "GENERA"}
+              {isGenerating ? "SYCHING..." : "GENERA"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={20} /></button>
             <button className="btn-icon btn-stop" onClick={() => { Tone.getTransport().stop(); setIsPlaying(false); }}><Square size={20} /></button>
@@ -210,7 +205,7 @@ function App() {
         </div>
         <AnimatePresence>
           {isCodeOpen && (
-            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}>
+            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
               <textarea className="code-area" value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} />
             </motion.div>
           )}
@@ -218,8 +213,8 @@ function App() {
       </section>
 
       <div className="status-bar">
-        <div>BPM: {isPlaying ? '120' : '0'}</div>
-        <div>Vercel: {isGenerating ? 'BUSY' : 'IDLE'}</div>
+        <div>BPM: 120</div>
+        <div>DINO.OS // READY</div>
       </div>
     </div>
   )
