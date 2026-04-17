@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Radio, Zap, Cpu, Keyboard as KeyboardIcon, Activity
+  Play, Square, Activity
 } from 'lucide-react'
 import './App.css'
 
@@ -16,7 +16,7 @@ function App() {
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
-  const [bpm, setBpm] = useState(124);
+  const [bpm] = useState(124);
   
   // STATO DEL SEQUENCER
   const [grid, setGrid] = useState<Record<TrackName, boolean[]>>({
@@ -32,6 +32,10 @@ function App() {
   // Riferimenti persistenti per Tone.js
   const instrumentsRef = useRef<Partial<Record<TrackName, any>>>({});
   const sequencerRef = useRef<Tone.Sequence | null>(null);
+
+  // Sincronizzazione griglia per il sequencer (useRef per evitare closure obsolete)
+  const gridRef = useRef(grid);
+  useEffect(() => { gridRef.current = grid; }, [grid]);
 
   // Inizializzazione Audio Engine
   const initEngine = async () => {
@@ -69,10 +73,6 @@ function App() {
 
     setIsAudioStarted(true);
   };
-
-  // Sincronizzazione griglia per il sequencer (useRef per evitare closure obsolete)
-  const gridRef = useRef(grid);
-  useEffect(() => { gridRef.current = grid; }, [grid]);
 
   const toggleTransport = () => {
     if (isPlaying) {
@@ -170,7 +170,7 @@ function App() {
       <section className="keyboard-panel">
         {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C2'].map((note, i) => (
           <div 
-            key={i} 
+            key={note + i} 
             className={`key ${note.includes('#') ? 'black' : 'white'}`}
             onMouseDown={() => instrumentsRef.current.bass?.triggerAttack(note + "2")}
             onMouseUp={() => instrumentsRef.current.bass?.triggerRelease()}
