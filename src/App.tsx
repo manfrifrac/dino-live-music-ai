@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Volume2, VolumeX, Zap, Radio, Code2, AlertCircle, Terminal
+  Play, Square, Volume2, VolumeX, Zap, Radio, AlertCircle, Terminal
 } from 'lucide-react'
 import './App.css'
 
@@ -13,7 +13,7 @@ declare global {
   }
 }
 
-const DEFAULT_CODE = `// Dino-Live OS v4.1 - Initializing...
+const DEFAULT_CODE = `// Dino-Live OS v4.1 - Perfected
 window.dinoChannels = {}; 
 window.dinoTriggers = {};
 
@@ -73,7 +73,8 @@ function App() {
       
       setTimeout(scanPerformanceRack, 200);
     } catch (err: any) {
-      setErrorLog(err.message || "Errore di esecuzione");
+      console.error(err);
+      setErrorLog(err.message || "Errore Kernel");
     }
   };
 
@@ -100,12 +101,14 @@ function App() {
       });
       const data = await response.json();
       if (data.code) {
-        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "OK" }].slice(-6));
+        const userMsg: Message = { role: 'user', content: currentPrompt };
+        const assistantMsg: Message = { role: 'assistant', content: "OK" };
+        setHistory(prev => [...prev, userMsg, assistantMsg].slice(-6));
         setCode(data.code);
         await executeCode(data.code);
       }
     } catch (err) {
-      setErrorLog("AI connection lost");
+      setErrorLog("AI Offline");
     } finally {
       setIsGenerating(false);
     }
@@ -133,7 +136,6 @@ function App() {
         </div>
       </header>
 
-      {/* RACK PERFORMANCE - Top priority for interaction */}
       <div className="rack">
         <div className="rack-label"><Radio size={10} /> Live Mixer</div>
         <div className="mixer-scroll">
@@ -143,7 +145,6 @@ function App() {
               <div className="track-name">{t}</div>
             </div>
           ))}
-          {loopTracks.length === 0 && <div className="placeholder-text">Nessun loop...</div>}
         </div>
 
         <div className="rack-label" style={{ marginTop: '10px' }}><Zap size={10} /> Instant Triggers</div>
@@ -154,7 +155,6 @@ function App() {
               <div className="track-name">{t}</div>
             </div>
           ))}
-          {triggerSuoni.length === 0 && <div className="placeholder-text">Nessun trigger...</div>}
         </div>
       </div>
 
@@ -162,13 +162,13 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Comando neurale (es. 'Aggiungi una snare techno', 'Crea un trigger crash')..."
+            placeholder="Comando neurale..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "CODIFICA IN CORSO..." : "EVOLVI SISTEMA"}
+              {isGenerating ? "CODIFICA..." : "EVOLVI SISTEMA"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={18} /></button>
             <button className="btn-icon" style={{ borderColor: '#ff3131', color: '#ff3131' }} onClick={() => Tone.getTransport().stop()}>
@@ -178,7 +178,6 @@ function App() {
         </div>
       </section>
 
-      {/* CODE VIEW - Visible below prompt for direct feedback */}
       <section className="panel code-preview-panel">
         <div className="panel-header" style={{ padding: '0.4rem 1rem' }}>
           <div className="panel-title" style={{fontSize: '0.65rem'}}><Terminal size={12} /> Kernell Code Output</div>
@@ -200,7 +199,7 @@ function App() {
 
       <div className="status-bar">
         <div>STATUS: {isGenerating ? 'GEN_MODE' : 'STABLE'}</div>
-        <div>MEM: {Math.floor(Math.random() * 50) + 120}MB // DSP: {isPlaying ? 'ACTIVE' : 'IDLE'}</div>
+        <div>MEM: 124MB // DSP: {loopTracks.length > 0 ? 'ACTIVE' : 'IDLE'}</div>
       </div>
     </div>
   )
