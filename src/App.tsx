@@ -6,19 +6,27 @@ import {
 } from 'lucide-react'
 import './App.css'
 
-// --- CONFIGURAZIONE STRUMENTI FISSI ---
 const TRACKS = ['kick', 'snare', 'hihat', 'bass'] as const;
 type TrackName = typeof TRACKS[number];
-
 const STEPS = 16;
+
+// Definizione note per la tastiera
+const NOTES = [
+  { n: 'C', t: 'white' }, { n: 'C#', t: 'black' },
+  { n: 'D', t: 'white' }, { n: 'D#', t: 'black' },
+  { n: 'E', t: 'white' }, { n: 'F', t: 'white' },
+  { n: 'F#', t: 'black' }, { n: 'G', t: 'white' },
+  { n: 'G#', t: 'black' }, { n: 'A', t: 'white' },
+  { n: 'A#', t: 'black' }, { n: 'B', t: 'white' },
+  { n: 'C2', t: 'white' }
+];
 
 function App() {
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
-  const [bpm] = useState(124);
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
   
-  // STATO DEL SEQUENCER
   const [grid, setGrid] = useState<Record<TrackName, boolean[]>>({
     kick: Array(STEPS).fill(false),
     snare: Array(STEPS).fill(false),
@@ -29,94 +37,61 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Riferimenti persistenti per Tone.js
-  const instrumentsRef = useRef<Partial<Record<TrackName, any>>>({});
+  const instrumentsRef = useRef<any>({});
   const sequencerRef = useRef<Tone.Sequence | null>(null);
-
-  // Sincronizzazione griglia per il sequencer (useRef per evitare closure obsolete)
   const gridRef = useRef(grid);
+
   useEffect(() => { gridRef.current = grid; }, [grid]);
 
-  // Inizializzazione Audio Engine
   const initEngine = async () => {
     await Tone.start();
     
-    // Setup Strumenti
-    const kick = new Tone.MembraneSynth().toDestination();
-    const snare = new Tone.NoiseSynth({
-      envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
-    }).toDestination();
-    const hihat = new Tone.MetalSynth({
-      envelope: { attack: 0.001, decay: 0.1, sustain: 0 }
-    }).toDestination();
-    const bass = new Tone.MonoSynth({
+    instrumentsRef.current.kick = new Tone.MembraneSynth().toDestination();
+    instrumentsRef.current.snare = new Tone.NoiseSynth({ envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }).toDestination();
+    instrumentsRef.current.hihat = new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }).toDestination();
+    instrumentsRef.current.bass = new Tone.MonoSynth({
       oscillator: { type: "sawtooth" },
-      envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 0.8 }
+      envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 0.8 }
     }).toDestination();
 
-    instrumentsRef.current = { kick, snare, hihat, bass };
-
-    // Setup Sequencer
     sequencerRef.current = new Tone.Sequence((time, step) => {
       setCurrentStep(step);
-      
-      // Controlla la griglia e suona
-      TRACKS.forEach(track => {
-        if (gridRef.current[track][step]) {
-          if (track === 'kick') instrumentsRef.current.kick?.triggerAttackRelease("C1", "8n", time);
-          if (track === 'snare') instrumentsRef.current.snare?.triggerAttackRelease("16n", time);
-          if (track === 'hihat') instrumentsRef.current.hihat?.triggerAttackRelease("32n", time);
-          if (track === 'bass') instrumentsRef.current.bass?.triggerAttackRelease("C2", "8n", time);
-        }
-      });
+      if (gridRef.current.kick[step]) instrumentsRef.current.kick.triggerAttackRelease("C1", "8n", time);
+      if (gridRef.current.snare[step]) instrumentsRef.current.snare.triggerAttackRelease("16n", time);
+      if (gridRef.current.hihat[step]) instrumentsRef.current.hihat.triggerAttackRelease("32n", time);
+      if (gridRef.current.bass[step]) instrumentsRef.current.bass.triggerAttackRelease("C2", "8n", time);
     }, Array.from({length: STEPS}, (_, i) => i), "16n");
 
     setIsAudioStarted(true);
   };
 
-  const toggleTransport = () => {
-    if (isPlaying) {
-      Tone.getTransport().stop();
-      setIsPlaying(false);
-      setCurrentStep(-1);
-    } else {
-      Tone.getTransport().start();
-      sequencerRef.current?.start(0);
-      setIsPlaying(true);
-    }
+  const playNote = (note: string) => {
+    const fullNote = note === 'C2' ? 'C3' : note + '2';
+    instrumentsRef.current.bass?.triggerAttack(fullNote);
+    setPressedKey(note);
   };
 
-  const toggleStep = (track: TrackName, stepIndex: number) => {
-    setGrid(prev => ({
-      ...prev,
-      [track]: prev[track].map((val, i) => i === stepIndex ? !val : val)
-    }));
+  const stopNote = () => {
+    instrumentsRef.current.bass?.triggerRelease();
+    setPressedKey(null);
   };
 
   const handleAiGenerate = async () => {
     if (!prompt || isGenerating) return;
     setIsGenerating(true);
-
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt, 
-          currentGrid: grid,
-          mode: 'daw' 
-        }),
+        body: JSON.stringify({ prompt, currentGrid: grid, mode: 'daw' }),
       });
-      
       const data = await response.json();
       if (data.newGrid) {
         setGrid(data.newGrid);
         setPrompt("");
-      } else if (data.error) {
-        alert(data.error);
       }
     } catch (err) {
-      alert("AI Sync Error");
+      alert("AI Error");
     } finally {
       setIsGenerating(false);
     }
@@ -129,8 +104,8 @@ function App() {
           <motion.div className="overlay" exit={{ opacity: 0 }} onClick={initEngine}>
             <div className="start-card">
               <Activity size={60} color="var(--matrix-green)" />
-              <h2>DINO.DAW 2026</h2>
-              <p>Inizializza Ambiente di Produzione</p>
+              <h2>DINO.DAW v1.1</h2>
+              <p>Clicca per sbloccare l'interfaccia</p>
             </div>
           </motion.div>
         )}
@@ -139,64 +114,55 @@ function App() {
       <header>
         <div className="brand">DINO.DAW</div>
         <div className="transport-bar">
-          <button className="btn-icon" onClick={toggleTransport}>
-            {isPlaying ? <Square fill="var(--matrix-green)" /> : <Play fill="var(--matrix-green)" />}
+          <button className="btn-icon" onClick={() => {
+            if (isPlaying) { Tone.getTransport().stop(); sequencerRef.current?.stop(); setIsPlaying(false); setCurrentStep(-1); }
+            else { Tone.getTransport().start(); sequencerRef.current?.start(0); setIsPlaying(true); }
+          }}>
+            {isPlaying ? <Square fill="#00ff41" /> : <Play fill="#00ff41" />}
           </button>
-          <div style={{ fontSize: '0.8rem' }}>BPM: {bpm}</div>
         </div>
       </header>
 
-      {/* SEQUENCER GRID */}
       <section className="sequencer-panel">
-        <div className="rack-label" style={{marginBottom:'10px'}}>Step Sequencer</div>
         {TRACKS.map(track => (
           <div key={track} className="sequencer-row">
             <div className="track-label">{track}</div>
             <div className="steps-container">
               {grid[track].map((active, i) => (
-                <div 
-                  key={i} 
-                  className={`step ${active ? 'active' : ''} ${currentStep === i ? 'current' : ''}`}
-                  onClick={() => toggleStep(track, i)}
-                />
+                <div key={i} className={`step ${active ? 'active' : ''} ${currentStep === i ? 'current' : ''}`} onClick={() => {
+                  const newGrid = {...grid};
+                  newGrid[track][i] = !newGrid[track][i];
+                  setGrid(newGrid);
+                }} />
               ))}
             </div>
           </div>
         ))}
       </section>
 
-      {/* PIANO KEYBOARD */}
-      <div className="rack-label" style={{margin:'10px 0 5px 1rem'}}>Virtual Synth Keys</div>
+      <div className="rack-label">Synth Keyboard (Bass/Lead)</div>
       <section className="keyboard-panel">
-        {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C2'].map((note, i) => (
+        {NOTES.map((note, i) => (
           <div 
-            key={note + i} 
-            className={`key ${note.includes('#') ? 'black' : 'white'}`}
-            onMouseDown={() => instrumentsRef.current.bass?.triggerAttack(note + "2")}
-            onMouseUp={() => instrumentsRef.current.bass?.triggerRelease()}
+            key={i} 
+            className={`key ${note.t} ${pressedKey === note.n ? 'active' : ''}`}
+            onMouseDown={() => playNote(note.n)}
+            onMouseUp={stopNote}
+            onMouseLeave={stopNote}
+            onTouchStart={(e) => { e.preventDefault(); playNote(note.n); }}
+            onTouchEnd={(e) => { e.preventDefault(); stopNote(); }}
           >
-            {note}
+            <span>{note.n}</span>
           </div>
         ))}
       </section>
 
-      {/* AI ASSISTANT */}
       <section className="ai-copilot">
-        <textarea
-          className="copilot-input"
-          placeholder="Dì all'IA cosa generare (es. 'Fai un ritmo techno', 'Pulisci snare', 'Crea un pattern trap')..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
+        <textarea className="copilot-input" placeholder="Prompt IA..." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
         <button className="btn-generate" onClick={handleAiGenerate} disabled={isGenerating}>
-          {isGenerating ? "ELABORAZIONE PATTERN..." : "✨ GENERA BEAT CON IA"}
+          {isGenerating ? "GENERANDO..." : "✨ GENERA PATTERN"}
         </button>
       </section>
-
-      <div className="status-bar">
-        <div>DAW_CORE_V1.0</div>
-        <div>BUFFER: OK // SYNC: INTERNAL</div>
-      </div>
     </div>
   )
 }
