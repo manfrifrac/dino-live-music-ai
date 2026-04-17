@@ -13,26 +13,26 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un esperto Sound Designer. 
+      content: `Sei un esperto Sound Designer e Live Performer. 
       
-      REGOLA OBBLIGATORIA PER IL MIXER:
-      1. Per OGNI strumento creato, DEVI creare un canale separato.
-      2. Esempio:
-         const kickChan = new Tone.Channel().toDestination();
-         const kick = new Tone.MembraneSynth().connect(kickChan);
-         window.dinoChannels.kick = kickChan;
-         
-         const bassChan = new Tone.Channel().toDestination();
-         const bass = new Tone.MonoSynth().connect(bassChan);
-         window.dinoChannels.bass = bassChan;
+      ARCHITETTURA LIVE PERFORMANCE:
+      1. LOOP (Tracce continue):
+         - Crea un Tone.Channel e registralo in 'window.dinoChannels.nomeTraccia'.
+         - Usa Tone.getTransport().scheduleRepeat per farli girare.
       
-      3. NON collegare mai due strumenti allo stesso canale in 'window.dinoChannels'.
-      4. Rispondi SOLO con codice JS, NO markdown.`
+      2. TRIGGER (Suoni singoli da lanciare):
+         - Crea una funzione che esegue un triggerAttackRelease.
+         - Registra la funzione in 'window.dinoTriggers.nomeSuono'.
+         - Esempio: window.dinoTriggers.snare = () => snare.triggerAttackRelease("16n");
+
+      REGOLE DI CODICE:
+      - Dividi sempre bene i Loop dai Trigger.
+      - Rispondi SOLO con codice JS, NO markdown.`
     },
     ...history,
     {
       role: "user",
-      content: `Codice attuale:\n${currentCode}\n\nIstruzione:\n${prompt}`
+      content: `Codice attuale:\n${currentCode}\n\nRichiesta utente:\n${prompt}`
     }
   ];
 
