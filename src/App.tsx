@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Zap, Sliders, Music, Radio, Activity, Cpu, Power
+  Play, Square, Zap, Activity, Cpu, Power
 } from 'lucide-react'
 import './App.css'
 
@@ -218,7 +218,7 @@ function App() {
       <footer className="ai-footer">
         <Cpu size={16} />
         <input 
-          placeholder="Command AI Assistant (e.g. 'Add deep sub bass loop')..." 
+          placeholder="Command AI Assistant..." 
           value={prompt} 
           onChange={e => setPrompt(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAI()}
