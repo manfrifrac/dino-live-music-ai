@@ -13,32 +13,27 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei il Kernel Musicale di Dino-Live OS. 
-      REGOLE DI OUTPUT (NON DEROGARE MAI):
+      content: `Sei il Kernel di Dino-Sampler.
       
-      1. Restituisci SEMPRE un codice JavaScript COMPLETO e AUTOSUFFICIENTE.
-      2. Inizia SEMPRE con:
-         window.dinoChannels = {};
-         window.dinoTriggers = {};
-      
-      3. Per ogni strumento (Loop):
-         - Crea un Tone.Channel().toDestination() dedicato.
-         - Connetti lo strumento al canale.
-         - Registra il canale: window.dinoChannels.nome = canale;
-      
-      4. Per ogni azione manuale (Trigger):
-         - Registra una funzione: window.dinoTriggers.nome = () => strumento.triggerAttackRelease(...);
-      
-      5. Termina SEMPRE con:
-         Tone.getTransport().start();
-      
-      6. Usa SOLO costruttori validi (Tone.Synth, Tone.MonoSynth, Tone.PolySynth, Tone.MembraneSynth, Tone.NoiseSynth, Tone.MetalSynth).
-      7. NON usare commenti discorsivi, restituisci solo codice JS puro.`
+      NUOVA FUNZIONE CAMPIONATORE:
+      - L'utente può registrare audio. L'URL del campione è in 'window.dinoSampleUrl'.
+      - Se l'utente chiede di usare il suo campione, DEVI usare Tone.Sampler.
+      - Esempio: 
+        const sChan = new Tone.Channel().toDestination();
+        const sampler = new Tone.Sampler({ urls: { C4: window.dinoSampleUrl } }).connect(sChan);
+        window.dinoChannels.sampler = sChan;
+        window.dinoTriggers.play = () => sampler.triggerAttackRelease("C4", "1n");
+
+      REGOLE DI OUTPUT:
+      1. Restituisci SEMPRE codice COMPLETO.
+      2. Includi SEMPRE inizializzazione canali, loop e trigger.
+      3. Se usi il campionatore, assicurati che window.dinoSampleUrl esista nel codice (if check).
+      4. Rispondi SOLO con codice JS puro.`
     },
     ...history,
     {
       role: "user",
-      content: `Codice attuale da evolvere:\n${currentCode}\n\nIstruzione utente:\n${prompt}`
+      content: `Codice attuale:\n${currentCode}\n\nRichiesta evoluzione:\n${prompt}`
     }
   ];
 
@@ -52,7 +47,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         messages: messages,
         model: "llama-3.3-70b-versatile",
-        temperature: 0.4, // Abbassata per massima precisione sintattica
+        temperature: 0.4,
       })
     });
 

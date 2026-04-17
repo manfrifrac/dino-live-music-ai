@@ -2,68 +2,57 @@
   --matrix-green: #00ff41;
   --matrix-bg: #050505;
   --glass: rgba(15, 15, 15, 0.9);
-  --accent-blue: #00e5ff;
+  --error: #ff3131;
 }
 
-body {
-  margin: 0; padding: 0;
-  background-color: var(--matrix-bg);
-  color: var(--matrix-green);
-  font-family: 'JetBrains Mono', monospace;
-  overflow: hidden;
-}
-
+body { margin: 0; padding: 0; background-color: var(--matrix-bg); color: var(--matrix-green); font-family: 'JetBrains Mono', monospace; overflow: hidden; }
 #root { width: 100%; height: 100vh; }
+.app-shell { display: flex; flex-direction: column; padding: 0.8rem; gap: 0.6rem; max-width: 800px; margin: 0 auto; height: 100%; }
 
-.app-shell {
-  display: flex; flex-direction: column;
-  padding: 0.8rem; gap: 0.6rem;
-  max-width: 800px; margin: 0 auto; height: 100%;
+header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 255, 65, 0.2); padding-bottom: 5px; }
+
+/* REC BUTTON */
+.rec-btn {
+  display: flex; align-items: center; gap: 8px; background: transparent; border: 1px solid var(--matrix-green);
+  color: var(--matrix-green); padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 0.7rem; font-weight: bold;
 }
+.rec-btn.recording { border-color: var(--error); color: var(--error); animation: pulse-red 1.5s infinite; }
+@keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 49, 49, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(255, 49, 49, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 49, 49, 0); } }
 
-header { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0, 255, 65, 0.2); }
-
-/* Mixer & Triggers */
-.rack-label { font-size: 0.6rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 5px; }
-
+/* PERFORMANCE RACK */
+.rack { display: flex; flex-direction: column; gap: 4px; }
+.rack-label { font-size: 0.6rem; text-transform: uppercase; opacity: 0.5; }
 .mixer-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
 
-.track-btn {
-  flex: 0 0 auto; width: 65px; height: 60px;
-  background: var(--glass); border: 1px solid rgba(0, 255, 65, 0.3);
-  border-radius: 10px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+.track-btn, .trigger-btn {
+  flex: 0 0 auto; width: 70px; height: 65px; background: var(--glass); border: 1px solid rgba(0, 255, 65, 0.2);
+  border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer;
 }
 .track-btn.active { border-color: var(--matrix-green); box-shadow: 0 0 10px rgba(0, 255, 65, 0.2); }
-.track-btn.muted { opacity: 0.4; border-color: #ff3131; }
+.track-btn.muted { opacity: 0.4; filter: grayscale(1); }
+.trigger-btn { border-color: #00e5ff; color: #00e5ff; }
+.track-name { font-size: 0.55rem; font-weight: bold; text-transform: uppercase; max-width: 90%; overflow: hidden; }
 
-.trigger-btn {
-  flex: 0 0 auto; width: 65px; height: 60px;
-  background: rgba(0, 229, 255, 0.1); border: 1px solid var(--accent-blue);
-  border-radius: 10px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 4px; cursor: pointer;
-  color: var(--accent-blue);
-}
-.trigger-btn:active { transform: scale(0.9); background: var(--accent-blue); color: #000; }
-
-.track-name { font-size: 0.55rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90%; }
-
-/* Main Panels */
-.panel { background: var(--glass); border: 1px solid rgba(0, 255, 65, 0.15); border-radius: 12px; }
+/* PANELS */
+.panel { background: var(--glass); border: 1px solid rgba(0, 255, 65, 0.1); border-radius: 12px; overflow: hidden; }
+.panel-header { padding: 0.5rem 1rem; background: rgba(0, 255, 65, 0.05); cursor: pointer; font-size: 0.7rem; display: flex; align-items: center; gap: 8px; }
 .panel-content { padding: 0.8rem; }
 
 textarea.main-prompt {
-  width: 100%; min-height: 80px;
-  background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 255, 65, 0.3);
-  border-radius: 8px; color: #fff; padding: 0.8rem; font-size: 1rem;
+  width: 100%; min-height: 80px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 255, 65, 0.3);
+  border-radius: 10px; color: #fff; padding: 0.8rem; font-family: inherit; font-size: 1rem;
 }
+.action-bar { display: flex; gap: 8px; margin-top: 8px; }
+.btn-primary { flex: 1; background: var(--matrix-green); color: #000; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; }
+.btn-icon { width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--matrix-green); color: var(--matrix-green); background: transparent; border-radius: 10px; cursor: pointer; }
 
-.action-bar { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.code-area { width: 100%; height: 200px; background: #000; color: var(--matrix-green); border: none; font-family: 'Fira Code', monospace; font-size: 0.7rem; padding: 1rem; }
 
-.btn-primary { flex: 1; background: var(--matrix-green); color: #000; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; }
-.btn-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--matrix-green); color: var(--matrix-green); background: transparent; border-radius: 8px; }
+/* OVERLAY */
+.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.start-card { border: 2px solid var(--matrix-green); padding: 3rem; border-radius: 20px; text-align: center; box-shadow: 0 0 30px var(--matrix-green); }
 
-.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.start-card { border: 2px solid var(--matrix-green); padding: 2.5rem; border-radius: 20px; text-align: center; }
-
-.status-bar { margin-top: auto; display: flex; justify-content: space-between; font-size: 0.55rem; opacity: 0.5; padding: 0.5rem 0; }
+.status-bar { margin-top: auto; display: flex; justify-content: space-between; font-size: 0.6rem; opacity: 0.5; padding: 0.5rem 0; }
+.dot { width: 6px; height: 6px; background: var(--matrix-green); border-radius: 50%; display: inline-block; box-shadow: 0 0 5px var(--matrix-green); }
+.dot.pulse { animation: pulse-green 1.5s infinite; }
+@keyframes pulse-green { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
