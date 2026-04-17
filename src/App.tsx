@@ -1,20 +1,29 @@
 import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  Sparkles, 
+  Play, 
+  Square, 
+  ChevronDown, 
+  ChevronUp, 
+  Code2, 
+  Music2, 
+  Cpu,
+  History
+} from 'lucide-react'
 import './App.css'
 
-const DEFAULT_CODE = `// Dino-Live Matrix 2026
-// Benvenuto nel sistema di composizione assistita.
-
+const DEFAULT_CODE = `// Dino-Live OS v2026.4
 const synth = new Tone.PolySynth(Tone.Synth).toDestination();
-const reverb = new Tone.Reverb(2).toDestination();
-synth.connect(reverb);
+const filter = new Tone.Filter(2000, "lowpass").toDestination();
+synth.connect(filter);
 
-// Loop armonico iniziale
 const loop = new Tone.Loop((time) => {
-  synth.triggerAttackRelease(["C3", "G3", "C4"], "2n", time);
-}, "1n").start(0);
+  synth.triggerAttackRelease(["E2", "E3"], "16n", time);
+}, "8n").start(0);
 
-Tone.getTransport().bpm.value = 80;
+Tone.getTransport().bpm.value = 124;
 Tone.getTransport().start();
 `;
 
@@ -30,58 +39,40 @@ function App() {
   const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
+  // Panel States
+  const [isCodeOpen, setIsCodeOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
   const codeRef = useRef<string>(DEFAULT_CODE);
   const historyRef = useRef<Message[]>([]);
 
   useEffect(() => {
     codeRef.current = code;
-  }, [code]);
-
-  useEffect(() => {
     historyRef.current = history;
-  }, [history]);
+  }, [code, history]);
 
   const executeCode = async (codeToRun: string) => {
     await Tone.start();
     try {
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
-      
       Tone.getDestination().mute = true;
       
-      // Valutazione dinamica
       const func = new Function('Tone', codeToRun);
       func(Tone);
       
       setTimeout(() => {
         Tone.getDestination().mute = false;
-      }, 50);
-
+      }, 60);
       setIsPlaying(true);
     } catch (err) {
-      console.error("Audio Exec Error:", err);
-      // Tentativo di ripristino
+      console.error(err);
       Tone.getDestination().mute = false;
     }
   };
 
-  const handlePlayManual = () => {
-    executeCode(codeRef.current);
-  };
-
-  const handleStop = () => {
-    Tone.getTransport().stop();
-    Tone.getTransport().cancel();
-    Tone.getDestination().mute = true;
-    setTimeout(() => {
-      Tone.getDestination().mute = false;
-    }, 100);
-    setIsPlaying(false);
-  };
-
   const handleAiGenerate = async () => {
     if (!prompt || isGenerating) return;
-    
     const currentPrompt = prompt;
     setPrompt("");
     setIsGenerating(true);
@@ -99,88 +90,120 @@ function App() {
       
       const data = await response.json();
       if (data.code) {
-        const newCode = data.code;
-        
-        // Aggiorna storia locale
-        const newHistory: Message[] = [
-          ...historyRef.current,
-          { role: 'user', content: currentPrompt },
-          { role: 'assistant', content: "Codice aggiornato." }
-        ];
-        
-        // Mantieni solo gli ultimi 10 messaggi per non saturare il contesto
-        setHistory(newHistory.slice(-10));
-        setCode(newCode);
-        
-        // Auto-Play
-        await executeCode(newCode);
+        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "Codice evoluto." }].slice(-10));
+        setCode(data.code);
+        await executeCode(data.code);
       } else {
-        alert("Errore AI: " + (data.error || "Sconosciuto"));
+        alert(data.error || "Errore IA");
       }
     } catch (err) {
-      console.error(err);
-      alert("Errore connessione AI.");
+      alert("Errore di rete");
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="App">
-      <div className="scanline"></div>
-      
-      <h1>Dino-Live 2026</h1>
-      
-      <div className="ai-container">
-        <div className="prompt-wrapper">
+    <div className="app-shell">
+      <header>
+        <div className="brand">DINO.OS</div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div className={`dot ${isPlaying ? 'pulse' : ''}`} />
+          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>2026.REL_4</span>
+        </div>
+      </header>
+
+      {/* Main Prompt Panel - Always Open/Prominent */}
+      <section className="panel prompt-panel">
+        <div className="panel-header">
+          <div className="panel-title"><Sparkles size={18} /> Comando Neurale</div>
+          <Cpu size={16} style={{ opacity: 0.5 }} />
+        </div>
+        <div className="panel-content">
           <textarea
-            className="prompt-input"
-            placeholder="Comanda l'IA (es. 'Aggiungi una batteria techno', 'Sposta in scala minore', 'Rendi tutto più spaziale')..."
+            className="main-prompt"
+            placeholder="Cosa vuoi creare? (es. 'Aggiungi una batteria techno', 'Sposta tutto in Re minore', 'Rendi il suono più acido')"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleAiGenerate();
-              }
-            }}
             disabled={isGenerating}
           />
-          <button 
-            className="ai-btn" 
-            onClick={handleAiGenerate} 
-            disabled={isGenerating || !prompt.trim()}
-          >
-            {isGenerating ? "⚡ SINCRONIZZAZIONE..." : "✨ EVOLVI SISTEMA"}
-          </button>
+          <div className="action-bar">
+            <button 
+              className="btn-primary" 
+              onClick={handleAiGenerate}
+              disabled={isGenerating || !prompt.trim()}
+            >
+              {isGenerating ? "ELABORAZIONE..." : "EVOLVI TRACCIA"}
+            </button>
+            <button className="btn-icon" onClick={() => executeCode(code)}>
+              <Play size={20} />
+            </button>
+            <button className="btn-icon btn-stop" onClick={() => {
+              Tone.getTransport().stop();
+              Tone.getTransport().cancel();
+              setIsPlaying(false);
+            }}>
+              <Square size={20} />
+            </button>
+          </div>
         </div>
-        <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', opacity: 0.6 }}>
-          L'IA ricorda le modifiche precedenti. Usa Shift+Enter per andare a capo.
-        </div>
-      </div>
+      </section>
 
-      <div className="editor-container">
-        <textarea
-          className="code-editor"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          spellCheck={false}
-          autoComplete="off"
-        />
-        
-        <div className="controls">
-          <button className="btn" onClick={handlePlayManual}>
-            {isPlaying ? "🔄 RESET MANUALE" : "▶️ ESEGUI CODICE"}
-          </button>
-          <button className="btn btn-stop" onClick={handleStop}>
-            ⏹️ TERMINA AUDIO
-          </button>
+      {/* Code Editor Panel - Collapsible */}
+      <section className="panel">
+        <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
+          <div className="panel-title"><Code2 size={18} /> Sorgente Nucleo</div>
+          {isCodeOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
-      </div>
+        <AnimatePresence>
+          {isCodeOpen && (
+            <motion.div 
+              initial={{ height: 0 }}
+              animate={{ height: 'auto' }}
+              exit={{ height: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <textarea
+                className="code-area"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                spellCheck={false}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
 
-      <footer style={{ marginTop: '3rem', fontSize: '0.8rem', opacity: 0.4 }}>
-        SISTEMA OPERATIVO DINO-OS // MATRIX V2026.4 // STATUS: ONLINE
-      </footer>
+      {/* History Panel - Collapsible */}
+      <section className="panel">
+        <div className="panel-header" onClick={() => setIsHistoryOpen(!isHistoryOpen)}>
+          <div className="panel-title"><History size={18} /> Log Evoluzione</div>
+          {isHistoryOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </div>
+        <AnimatePresence>
+          {isHistoryOpen && (
+            <motion.div 
+              initial={{ height: 0 }}
+              animate={{ height: 'auto' }}
+              exit={{ height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="panel-content"
+              style={{ fontSize: '0.8rem', opacity: 0.8 }}
+            >
+              {history.length === 0 ? "Nessun log disponibile." : history.filter(h => h.role === 'user').map((h, i) => (
+                <div key={i} style={{ marginBottom: '5px' }}>
+                  <span style={{ color: 'var(--matrix-green)' }}>&gt;</span> {h.content}
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      <div className="status-bar">
+        <div>STATUS: {isGenerating ? 'SYNCING' : 'READY'}</div>
+        <div>MEM: 4.2GB // AUDIO: 44.1KHZ</div>
+      </div>
     </div>
   )
 }
