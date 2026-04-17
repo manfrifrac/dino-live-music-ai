@@ -2,11 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Zap, Activity, Cpu, Power
+  Play, Square, Zap, Activity, Power, List, Sliders, Music
 } from 'lucide-react'
 import './App.css'
 
-// --- CONSTANTS ---
 const TRACKS = ['kick', 'snare', 'hihat', 'bass'] as const;
 type TrackName = typeof TRACKS[number];
 const STEPS = 16;
@@ -24,9 +23,9 @@ function App() {
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
+  const [activeTab, setActiveTab] = useState<'grid' | 'device' | 'keys'>('grid');
   const [pressedKey, setPressedKey] = useState<string | null>(null);
   
-  // FX STATE
   const [cutoff, setCutoff] = useState(20000);
   const [reverbWet, setReverbWet] = useState(0.15);
 
@@ -40,7 +39,6 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // REFERENCES
   const instruments = useRef<any>({});
   const sequencer = useRef<Tone.Sequence | null>(null);
   const filter = useRef<Tone.Filter | null>(null);
@@ -49,14 +47,11 @@ function App() {
 
   useEffect(() => { gridRef.current = grid; }, [grid]);
 
-  // LIVE FX UPDATES
   useEffect(() => { if (filter.current) filter.current.frequency.rampTo(cutoff, 0.1); }, [cutoff]);
   useEffect(() => { if (reverb.current) reverb.current.wet.rampTo(reverbWet, 0.1); }, [reverbWet]);
 
   const initEngine = async () => {
     await Tone.start();
-    
-    // Master Chain
     const masterFilter = new Tone.Filter(20000, "lowpass", -24).toDestination();
     const masterReverb = new Tone.Reverb(2.5).connect(masterFilter);
     masterReverb.wet.value = 0.15;
@@ -64,7 +59,6 @@ function App() {
     filter.current = masterFilter;
     reverb.current = masterReverb;
 
-    // Instruments
     instruments.current.kick = new Tone.MembraneSynth().connect(masterFilter);
     instruments.current.snare = new Tone.NoiseSynth({ envelope: { attack: 0.001, decay: 0.2 } }).connect(masterReverb);
     instruments.current.hihat = new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.1 } }).connect(masterReverb);
@@ -73,7 +67,6 @@ function App() {
       envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.8 }
     }).connect(masterReverb);
 
-    // Ducking
     const ducking = new Tone.Gain(1).connect(masterReverb);
     instruments.current.bass.disconnect();
     instruments.current.bass.connect(ducking);
@@ -142,8 +135,8 @@ function App() {
           <motion.div className="overlay" exit={{ opacity: 0 }} onClick={initEngine}>
             <div className="start-card">
               <Power size={48} color="var(--ableton-accent)" />
-              <h1 style={{color:'white'}}>DINO LIVE PRO</h1>
-              <p>Inizializza Engine Ableton Style</p>
+              <h1 style={{color:'white', fontSize:'24px', margin:'10px 0'}}>DINO DAW MOBILE</h1>
+              <p style={{fontSize:'12px'}}>Ottimizzato per iPhone 12 Pro</p>
             </div>
           </motion.div>
         )}
@@ -153,78 +146,93 @@ function App() {
         <button className={`transport-btn ${isPlaying ? 'active' : ''}`} onClick={handlePlay}>
           {isPlaying ? <Square size={14} fill="black" /> : <Play size={14} fill="white" />}
         </button>
-        <div className="bpm-display">124.00</div>
         <div style={{flex:1}} />
-        <Activity size={16} color="var(--ableton-accent)" />
+        <div className="bpm-display">124</div>
+        <Activity size={16} color="var(--ableton-accent)" style={{marginLeft: '15px'}} />
       </header>
 
-      {/* TRACK LANES */}
-      <main className="main-view">
-        {TRACKS.map(t => (
-          <div key={t} className={`track-lane ${t}`}>
-            <div className="track-header">
-              <span className="track-name">{t}</span>
-              <div style={{height: '4px', width: '100%', background: '#000'}} />
+      {/* VIEW SELECTOR */}
+      <nav className="view-tabs">
+        <div className={`tab ${activeTab === 'grid' ? 'active' : ''}`} onClick={() => setActiveTab('grid')}>
+          <List size={14} /> <span>Grid</span>
+        </div>
+        <div className={`tab ${activeTab === 'device' ? 'active' : ''}`} onClick={() => setActiveTab('device')}>
+          <Sliders size={14} /> <span>FX</span>
+        </div>
+        <div className={`tab ${activeTab === 'keys' ? 'active' : ''}`} onClick={() => setActiveTab('keys')}>
+          <Music size={14} /> <span>Keys</span>
+        </div>
+      </nav>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="content-area">
+        {activeTab === 'grid' && (
+          <div style={{animation: 'fadeIn 0.2s'}}>
+            {TRACKS.map(t => (
+              <div key={t} className={`track-lane ${t}`}>
+                <div className="track-info">
+                  <span>{t}</span>
+                </div>
+                <div className="step-grid">
+                  {grid[t].map((active, i) => (
+                    <div 
+                      key={i} 
+                      className={`step ${active ? 'active' : ''} ${currentStep === i ? 'current' : ''}`}
+                      onClick={() => {
+                        const newGrid = {...grid};
+                        newGrid[t][i] = !newGrid[t][i];
+                        setGrid(newGrid);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'device' && (
+          <div className="mobile-detail" style={{animation: 'fadeIn 0.2s'}}>
+            <div className="knob-unit">
+              <label>Filter Cutoff</label>
+              <input type="range" min="100" max="20000" value={cutoff} onChange={e => setCutoff(Number(e.target.value))} />
             </div>
-            <div className="step-grid">
-              {grid[t].map((active, i) => (
-                <div 
-                  key={i} 
-                  className={`step ${active ? 'active' : ''} ${currentStep === i ? 'current' : ''}`}
-                  onClick={() => {
-                    const newGrid = {...grid};
-                    newGrid[t][i] = !newGrid[t][i];
-                    setGrid(newGrid);
-                  }}
-                />
-              ))}
+            <div className="knob-unit">
+              <label>Reverb Dry/Wet</label>
+              <input type="range" min="0" max="1" step="0.01" value={reverbWet} onChange={e => setReverbWet(Number(e.target.value))} />
             </div>
           </div>
-        ))}
+        )}
+
+        {activeTab === 'keys' && (
+          <div className="piano-container" style={{animation: 'fadeIn 0.2s'}}>
+            {PIANO_NOTES.map((note, i) => (
+              <div 
+                key={i} 
+                className={`mobile-key ${note.t} ${pressedKey === note.n ? 'active' : ''}`}
+                onMouseDown={() => playNote(note.n)}
+                onMouseUp={stopNote}
+                onMouseLeave={stopNote}
+                onTouchStart={(e) => { e.preventDefault(); playNote(note.n); }}
+                onTouchEnd={(e) => { e.preventDefault(); stopNote(); }}
+              >
+                <span>{note.n}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
 
-      {/* DEVICE RACK & PIANO ROLL */}
-      <section className="detail-view">
-        <div className="device-rack">
-          <div className="track-name" style={{fontSize:'9px'}}>Master Effects</div>
-          <div className="knob-container">
-            <label>Filter Cutoff</label>
-            <input type="range" min="100" max="20000" value={cutoff} onChange={e => setCutoff(Number(e.target.value))} />
-          </div>
-          <div className="knob-container">
-            <label>Reverb Dry/Wet</label>
-            <input type="range" min="0" max="1" step="0.01" value={reverbWet} onChange={e => setReverbWet(Number(e.target.value))} />
-          </div>
-        </div>
-
-        <div className="piano-roll">
-          {PIANO_NOTES.map((note, i) => (
-            <div 
-              key={i} 
-              className={`key ${note.t} ${pressedKey === note.n ? 'active' : ''}`}
-              onMouseDown={() => playNote(note.n)}
-              onMouseUp={stopNote}
-              onMouseLeave={stopNote}
-              onTouchStart={(e) => { e.preventDefault(); playNote(note.n); }}
-              onTouchEnd={(e) => { e.preventDefault(); stopNote(); }}
-            >
-              <span style={{fontSize:'8px', opacity:0.5}}>{note.n}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* AI COPILOT FOOTER */}
-      <footer className="ai-footer">
-        <Cpu size={16} />
+      {/* STICKY AI INPUT FOR MOBILE */}
+      <footer className="mobile-ai-bar">
         <input 
-          placeholder="Command AI Assistant..." 
+          placeholder="IA: 'Add UK Garage beat'..." 
           value={prompt} 
           onChange={e => setPrompt(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAI()}
         />
         <button className="transport-btn" onClick={handleAI} disabled={isGenerating}>
-          {isGenerating ? <Zap size={14} className="spin" /> : <Zap size={14} />}
+          <Zap size={18} fill={isGenerating ? "var(--ableton-accent)" : "none"} />
         </button>
       </footer>
     </div>
