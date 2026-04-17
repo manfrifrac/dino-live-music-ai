@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Radio, Zap, Cpu, Activity, Sliders, Music
+  Play, Square, Radio, Zap, Activity, Sliders, Music
 } from 'lucide-react'
 import './App.css'
 
@@ -197,8 +197,6 @@ function App() {
         <div className={`drum-pad synth-pad ${activePad === 'bassBb2' ? 'active' : ''}`} onPointerDown={() => triggerPad('bass', 'Bb2')}>
           <div className="pad-label">Bass Bb</div>
         </div>
-
-        {/* ... More pads could be added here to fill 4x4 ... */}
       </section>
 
       <section className="ai-copilot">
