@@ -2,118 +2,133 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Radio, Zap, Activity, Sliders, Music
+  Play, Square, Zap, Activity, Sliders, Music, Mic, RotateCcw, AlertCircle
 } from 'lucide-react'
 import './App.css'
 
+// --- COSTANTI DI SISTEMA ---
 const TRACKS = ['kick', 'snare', 'hihat', 'bass'] as const;
 type TrackName = typeof TRACKS[number];
 const STEPS = 16;
+const BASS_NOTES = ['C2', 'Eb2', 'F2', 'G2', 'Bb2', 'C3', 'Eb3', 'F3'];
 
 function App() {
+  // --- STATO ---
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [activePad, setActivePad] = useState<string | null>(null);
-  
-  // FX STATE
   const [cutoff, setCutoff] = useState(20000);
-  const [reverbWet, setReverbWet] = useState(0.2);
-
+  const [reverbWet, setReverbWet] = useState(0.15);
   const [grid, setGrid] = useState<Record<TrackName, boolean[]>>({
     kick: Array(STEPS).fill(false),
     snare: Array(STEPS).fill(false),
     hihat: Array(STEPS).fill(false),
     bass: Array(STEPS).fill(false),
   });
-
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // REFERENCES
-  const instrumentsRef = useRef<any>({});
-  const sequencerRef = useRef<Tone.Sequence | null>(null);
-  const filterRef = useRef<Tone.Filter | null>(null);
-  const reverbRef = useRef<Tone.Reverb | null>(null);
+  // --- RIFERIMENTI (AUDIO ENGINE) ---
+  const nodes = useRef<any>({});
+  const sequencer = useRef<Tone.Sequence | null>(null);
   const gridRef = useRef(grid);
-
+  
   useEffect(() => { gridRef.current = grid; }, [grid]);
 
-  // LIVE FX UPDATE
-  useEffect(() => {
-    if (filterRef.current) filterRef.current.frequency.value = cutoff;
-  }, [cutoff]);
+  // --- LIVE AUDIO UPDATES ---
+  useEffect(() => { if(nodes.current.filter) nodes.current.filter.frequency.rampTo(cutoff, 0.05); }, [cutoff]);
+  useEffect(() => { if(nodes.current.reverb) nodes.current.reverb.wet.rampTo(reverbWet, 0.1); }, [reverbWet]);
 
-  useEffect(() => {
-    if (reverbRef.current) reverbRef.current.wet.value = reverbWet;
-  }, [reverbWet]);
-
+  // --- INITIALIZATION ---
   const initEngine = async () => {
-    await Tone.start();
-    
-    // Master Chain (The "Fred Again" setup)
-    const masterFilter = new Tone.Filter(20000, "lowpass", -24).toDestination();
-    const masterReverb = new Tone.Reverb(3).connect(masterFilter);
-    masterReverb.wet.value = 0.2;
-    
-    filterRef.current = masterFilter;
-    reverbRef.current = masterReverb;
+    try {
+      await Tone.start();
+      
+      // Master Chain
+      const limiter = new Tone.Limiter(-1).toDestination();
+      const filter = new Tone.Filter(20000, "lowpass", -24).connect(limiter);
+      const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.15 }).connect(filter);
+      
+      // Ducking (Sidechain) node
+      const ducking = new Tone.Gain(1).connect(reverb);
+      
+      // Instruments
+      const kick = new Tone.MembraneSynth({ volume: 0 }).connect(filter);
+      const snare = new Tone.NoiseSynth({ volume: -6, envelope: { attack: 0.001, decay: 0.2 } }).connect(reverb);
+      const hihat = new Tone.MetalSynth({ volume: -12, envelope: { attack: 0.001, decay: 0.1 } }).connect(reverb);
+      const bass = new Tone.MonoSynth({
+        volume: -3,
+        oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.8 }
+      }).connect(ducking);
 
-    // Instruments
-    instrumentsRef.current.kick = new Tone.MembraneSynth().connect(masterFilter);
-    instrumentsRef.current.snare = new Tone.NoiseSynth({ envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }).connect(masterReverb);
-    instrumentsRef.current.hihat = new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }).connect(masterReverb);
-    instrumentsRef.current.bass = new Tone.MonoSynth({
-      oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
-      envelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 1 }
-    }).connect(masterReverb);
+      nodes.current = { kick, snare, hihat, bass, filter, reverb, ducking };
 
-    // SIDECHAIN SIMULATION: Duck bass when kick plays
-    const ducking = new Tone.Gain(1).connect(masterReverb);
-    instrumentsRef.current.bass.disconnect();
-    instrumentsRef.current.bass.connect(ducking);
+      // Sequence
+      sequencer.current = new Tone.Sequence((time, step) => {
+        setCurrentStep(step);
+        const g = gridRef.current;
+        
+        if (g.kick[step]) {
+          nodes.current.kick.triggerAttackRelease("C1", "8n", time);
+          nodes.current.ducking.gain.rampTo(0.1, 0.01, time);
+          nodes.current.ducking.gain.rampTo(1, 0.15, time + 0.05);
+        }
+        if (g.snare[step]) nodes.current.snare.triggerAttackRelease("16n", time);
+        if (g.hihat[step]) nodes.current.hihat.triggerAttackRelease("32n", time);
+        if (g.bass[step]) nodes.current.bass.triggerAttackRelease("C2", "8n", time);
+      }, Array.from({length: STEPS}, (_, i) => i), "16n");
 
-    sequencerRef.current = new Tone.Sequence((time, step) => {
-      setCurrentStep(step);
-      if (gridRef.current.kick[step]) {
-        instrumentsRef.current.kick.triggerAttackRelease("C1", "8n", time);
-        // Trigger Sidechain duck
-        ducking.gain.rampTo(0.2, 0.02, time);
-        ducking.gain.rampTo(1, 0.2, time + 0.1);
-      }
-      if (gridRef.current.snare[step]) instrumentsRef.current.snare.triggerAttackRelease("16n", time);
-      if (gridRef.current.hihat[step]) instrumentsRef.current.hihat.triggerAttackRelease("32n", time);
-      if (gridRef.current.bass[step]) instrumentsRef.current.bass.triggerAttackRelease("C2", "8n", time);
-    }, Array.from({length: STEPS}, (_, i) => i), "16n");
-
-    setIsAudioStarted(true);
+      setIsAudioStarted(true);
+    } catch (e) {
+      setError("Inizializzazione fallita");
+    }
   };
 
-  const triggerPad = (type: string, note?: string) => {
-    setActivePad(type + (note || ""));
-    if (type === 'kick') instrumentsRef.current.kick.triggerAttackRelease("C1", "8n");
-    if (type === 'snare') instrumentsRef.current.snare.triggerAttackRelease("16n");
-    if (type === 'hihat') instrumentsRef.current.hihat.triggerAttackRelease("32n");
-    if (type === 'bass') instrumentsRef.current.bass.triggerAttackRelease(note || "C2", "4n");
+  const handlePlay = () => {
+    if (isPlaying) {
+      Tone.getTransport().stop();
+      sequencer.current?.stop();
+      setIsPlaying(false);
+      setCurrentStep(-1);
+    } else {
+      Tone.getTransport().start();
+      sequencer.current?.start(0);
+      setIsPlaying(true);
+    }
+  };
+
+  const trigger = (inst: TrackName, note = "C1") => {
+    if (!isAudioStarted) return;
+    setActivePad(inst + note);
+    if (inst === 'kick') nodes.current.kick.triggerAttackRelease("C1", "8n");
+    if (inst === 'snare') nodes.current.snare.triggerAttackRelease("16n");
+    if (inst === 'hihat') nodes.current.hihat.triggerAttackRelease("32n");
+    if (inst === 'bass') nodes.current.bass.triggerAttackRelease(note, "4n");
     setTimeout(() => setActivePad(null), 100);
   };
 
-  const handleAiGenerate = async () => {
+  const handleAI = async () => {
     if (!prompt || isGenerating) return;
     setIsGenerating(true);
+    setError(null);
     try {
-      const response = await fetch('/api/generate', {
+      const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, currentGrid: grid, mode: 'daw' }),
       });
-      const data = await response.json();
+      const data = await res.json();
       if (data.newGrid) {
         setGrid(data.newGrid);
         setPrompt("");
+      } else {
+        setError("L'IA ha restituito dati non validi");
       }
-    } catch (err) {
-      alert("AI Sync Error");
+    } catch (e) {
+      setError("Errore connessione IA");
     } finally {
       setIsGenerating(false);
     }
@@ -125,86 +140,71 @@ function App() {
         {!isAudioStarted && (
           <motion.div className="overlay" exit={{ opacity: 0 }} onClick={initEngine}>
             <div className="start-card">
-              <Sliders size={60} color="var(--matrix-green)" />
-              <h2>DINO.LIVE PRO</h2>
-              <p>Fred Again Performance Mode</p>
+              <Power size={50} />
+              <h2>DINO-LIVE CORE</h2>
+              <p>Inizializza Motore Audio v5.5</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <header>
-        <div className="brand">DINO.LIVE</div>
-        <button className="btn-icon" onClick={() => {
-          if (isPlaying) { Tone.getTransport().stop(); sequencerRef.current?.stop(); setIsPlaying(false); setCurrentStep(-1); }
-          else { Tone.getTransport().start(); sequencerRef.current?.start(0); setIsPlaying(true); }
-        }}>
-          {isPlaying ? <Square fill="#ff3131" /> : <Play fill="#00ff41" />}
+        <div className="brand">DINO.PRO</div>
+        <button className={`btn-icon ${isPlaying ? 'stop' : 'play'}`} onClick={handlePlay}>
+          {isPlaying ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
         </button>
       </header>
 
-      {/* PERFORMANCE FX UNIT */}
-      <section className="performance-fx">
-        <div className="fx-control">
-          <div className="fx-label">Lowpass Cutoff</div>
-          <input type="range" min="100" max="20000" value={cutoff} onChange={(e) => setCutoff(Number(e.target.value))} />
-        </div>
-        <div className="fx-control">
-          <div className="fx-label">Reverb Wash</div>
-          <input type="range" min="0" max="1" step="0.01" value={reverbWet} onChange={(e) => setReverbWet(Number(e.target.value))} />
+      {/* PERFORMANCE UNIT */}
+      <section className="glass-panel">
+        <div className="flex-row">
+          <div className="fx-unit">
+            <label>Filter</label>
+            <input type="range" min="100" max="20000" value={cutoff} onChange={e => setCutoff(Number(e.target.value))} />
+          </div>
+          <div className="fx-unit">
+            <label>Wash</label>
+            <input type="range" min="0" max="0.8" step="0.01" value={reverbWet} onChange={e => setReverbWet(Number(e.target.value))} />
+          </div>
         </div>
       </section>
 
-      {/* MINI VISUAL SEQUENCER */}
-      <div className="mini-sequencer">
-        {TRACKS.map(track => (
-          <div key={track} className="mini-row">
-            {grid[track].map((active, i) => (
-              <div key={i} className={`mini-step ${active ? 'active' : ''} ${currentStep === i ? 'current' : ''}`} />
-            ))}
+      {/* MINI SEQ VISUAL */}
+      <div className="mini-seq">
+        {Array(STEPS).fill(0).map((_, i) => (
+          <div key={i} className={`mini-dot ${currentStep === i ? 'active' : ''} ${TRACKS.some(t => grid[t][i]) ? 'has-sound' : ''}`} />
+        ))}
+      </div>
+
+      {/* DRUM RACK */}
+      <div className="pad-grid">
+        <div className={`pad k ${activePad === 'kickC1' ? 'hit' : ''}`} onPointerDown={() => trigger('kick')}>KICK</div>
+        <div className={`pad s ${activePad === 'snareC1' ? 'hit' : ''}`} onPointerDown={() => trigger('snare')}>SNARE</div>
+        <div className={`pad h ${activePad === 'hihatC1' ? 'hit' : ''}`} onPointerDown={() => trigger('hihat')}>HIHAT</div>
+        <div className="pad disabled">--</div>
+        
+        {BASS_NOTES.map(n => (
+          <div key={n} className={`pad b ${activePad === 'bass'+n ? 'hit' : ''}`} onPointerDown={() => trigger('bass', n)}>
+            {n.replace('2', '')}
           </div>
         ))}
       </div>
 
-      {/* DRUM PAD RACK 4x4 */}
-      <section className="pad-grid">
-        <div className={`drum-pad kick-pad ${activePad === 'kick' ? 'active' : ''}`} onPointerDown={() => triggerPad('kick')}>
-          <div className="pad-label">Kick</div>
-          <Zap size={20} />
+      {/* AI PILOT */}
+      <footer className="ai-section">
+        {error && <div className="err-msg"><AlertCircle size={12} /> {error}</div>}
+        <div className="input-group">
+          <input 
+            placeholder="Comando Vibe (es. 'Techno dark')" 
+            value={prompt} 
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAI()}
+          />
+          <button onClick={handleAI} disabled={isGenerating}>
+            {isGenerating ? <RotateCcw className="spin" size={16} /> : <Zap size={16} />}
+          </button>
         </div>
-        <div className={`drum-pad snare-pad ${activePad === 'snare' ? 'active' : ''}`} onPointerDown={() => triggerPad('snare')}>
-          <div className="pad-label">Snare</div>
-          <Activity size={20} />
-        </div>
-        <div className={`drum-pad ${activePad === 'hihat' ? 'active' : ''}`} onPointerDown={() => triggerPad('hihat')}>
-          <div className="pad-label">H-Hat</div>
-          <Radio size={20} />
-        </div>
-        <div className={`drum-pad synth-pad ${activePad === 'bassC2' ? 'active' : ''}`} onPointerDown={() => triggerPad('bass', 'C2')}>
-          <div className="pad-label">Bass C</div>
-          <Music size={20} />
-        </div>
-
-        <div className={`drum-pad synth-pad ${activePad === 'bassEb2' ? 'active' : ''}`} onPointerDown={() => triggerPad('bass', 'Eb2')}>
-          <div className="pad-label">Bass Eb</div>
-        </div>
-        <div className={`drum-pad synth-pad ${activePad === 'bassF2' ? 'active' : ''}`} onPointerDown={() => triggerPad('bass', 'F2')}>
-          <div className="pad-label">Bass F</div>
-        </div>
-        <div className={`drum-pad synth-pad ${activePad === 'bassG2' ? 'active' : ''}`} onPointerDown={() => triggerPad('bass', 'G2')}>
-          <div className="pad-label">Bass G</div>
-        </div>
-        <div className={`drum-pad synth-pad ${activePad === 'bassBb2' ? 'active' : ''}`} onPointerDown={() => triggerPad('bass', 'Bb2')}>
-          <div className="pad-label">Bass Bb</div>
-        </div>
-      </section>
-
-      <section className="ai-copilot">
-        <textarea className="copilot-input" placeholder="Prompt (es. 'Fai un beat UK Garage', 'Aggiungi atmosfera')..." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-        <button className="btn-generate" onClick={handleAiGenerate} disabled={isGenerating}>
-          {isGenerating ? "ANALISI VIBE..." : "✨ EVOLVI SET"}
-        </button>
-      </section>
+      </footer>
     </div>
   )
 }
