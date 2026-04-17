@@ -12,10 +12,9 @@ declare global {
   }
 }
 
-const DEFAULT_CODE = `// Dino-Live OS - FIX v3
+const DEFAULT_CODE = `// Dino-Live OS - FIX v3.1
 window.dinoChannels = {}; 
 
-// Canali e Strumenti
 const master = new Tone.Channel().toDestination();
 const kick = new Tone.MembraneSynth().connect(master);
 const synth = new Tone.PolySynth().connect(master);
@@ -23,7 +22,6 @@ const synth = new Tone.PolySynth().connect(master);
 window.dinoChannels.kick = master;
 window.dinoChannels.synth = master;
 
-// Sequenza semplice
 Tone.getTransport().scheduleRepeat((time) => {
   kick.triggerAttackRelease("C1", "8n", time);
 }, "4n");
@@ -40,7 +38,6 @@ interface Message { role: 'user' | 'assistant'; content: string; }
 
 function App() {
   const [code, setCode] = useState(DEFAULT_CODE);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<Message[]>([]);
@@ -83,7 +80,6 @@ function App() {
       func(Tone);
       
       setTimeout(() => updateMixerUI(), 150);
-      setIsPlaying(true);
     } catch (err: any) {
       console.error(err);
       setErrorLog(err.message || "Errore nel codice");
@@ -191,7 +187,7 @@ function App() {
               {isGenerating ? "SYCHING..." : "GENERA"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={20} /></button>
-            <button className="btn-icon btn-stop" onClick={() => { Tone.getTransport().stop(); setIsPlaying(false); }}><Square size={20} /></button>
+            <button className="btn-icon btn-stop" onClick={() => { Tone.getTransport().stop(); }}><Square size={20} /></button>
           </div>
         </div>
       </section>
@@ -213,7 +209,6 @@ function App() {
       </section>
 
       <div className="status-bar">
-        <div>BPM: 120</div>
         <div>DINO.OS // READY</div>
       </div>
     </div>
