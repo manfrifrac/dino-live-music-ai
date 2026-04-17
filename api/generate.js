@@ -13,23 +13,32 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un esperto programmatore di Tone.js (Dino-Live OS).
+      content: `Sei il Kernel Musicale di Dino-Live OS. 
+      REGOLE DI OUTPUT (NON DEROGARE MAI):
       
-      DICTIONARY DEGLI STRUMENTI VALIDI (USA SOLO QUESTI):
-      - Sintetizzatori: Tone.Synth, Tone.MonoSynth, Tone.PolySynth, Tone.MembraneSynth (per Kick), Tone.MetalSynth (per piatti), Tone.NoiseSynth (per snare/hi-hats), Tone.PluckSynth, Tone.AMSynth, Tone.FMSynth, Tone.DuoSynth.
-      - Effetti: Tone.Reverb, Tone.FeedbackDelay, Tone.Distortion, Tone.Chorus, Tone.Phaser, Tone.BitCrusher, Tone.Filter.
-      - Mixer: Tone.Channel.
+      1. Restituisci SEMPRE un codice JavaScript COMPLETO e AUTOSUFFICIENTE.
+      2. Inizia SEMPRE con:
+         window.dinoChannels = {};
+         window.dinoTriggers = {};
       
-      REGOLE MANDATORIE:
-      1. NON usare mai 'SimpleSynth' o altri nomi inventati.
-      2. Per i LOOP: registra il canale in 'window.dinoChannels.nome'.
-      3. Per i TRIGGER: registra la funzione in 'window.dinoTriggers.nome'.
-      4. Rispondi SOLO con codice JS pulito.`
+      3. Per ogni strumento (Loop):
+         - Crea un Tone.Channel().toDestination() dedicato.
+         - Connetti lo strumento al canale.
+         - Registra il canale: window.dinoChannels.nome = canale;
+      
+      4. Per ogni azione manuale (Trigger):
+         - Registra una funzione: window.dinoTriggers.nome = () => strumento.triggerAttackRelease(...);
+      
+      5. Termina SEMPRE con:
+         Tone.getTransport().start();
+      
+      6. Usa SOLO costruttori validi (Tone.Synth, Tone.MonoSynth, Tone.PolySynth, Tone.MembraneSynth, Tone.NoiseSynth, Tone.MetalSynth).
+      7. NON usare commenti discorsivi, restituisci solo codice JS puro.`
     },
     ...history,
     {
       role: "user",
-      content: `Codice attuale:\n${currentCode}\n\nRichiesta:\n${prompt}`
+      content: `Codice attuale da evolvere:\n${currentCode}\n\nIstruzione utente:\n${prompt}`
     }
   ];
 
@@ -43,7 +52,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         messages: messages,
         model: "llama-3.3-70b-versatile",
-        temperature: 0.5,
+        temperature: 0.4, // Abbassata per massima precisione sintattica
       })
     });
 
@@ -52,6 +61,6 @@ export default async function handler(req, res) {
     generatedCode = generatedCode.replace(/```javascript/g, "").replace(/```/g, "").trim();
     res.status(200).json({ code: generatedCode });
   } catch (error) {
-    res.status(500).json({ error: "Errore" });
+    res.status(500).json({ error: "Errore Kernel" });
   }
 }

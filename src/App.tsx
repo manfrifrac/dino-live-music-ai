@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Volume2, VolumeX, Zap, Radio, Code2, AlertCircle
+  Play, Square, Volume2, VolumeX, Zap, Radio, Code2, AlertCircle, Terminal
 } from 'lucide-react'
 import './App.css'
 
@@ -13,25 +13,15 @@ declare global {
   }
 }
 
-const DEFAULT_CODE = `// Dino-Live PRO: Loops & Triggers
+const DEFAULT_CODE = `// Dino-Live OS v4.1 - Initializing...
 window.dinoChannels = {}; 
 window.dinoTriggers = {};
 
-// 1. I LOOP (Base costante)
 const kickChan = new Tone.Channel().toDestination();
 const kick = new Tone.MembraneSynth().connect(kickChan);
 window.dinoChannels.kick = kickChan;
 
-Tone.getTransport().scheduleRepeat((t) => {
-  kick.triggerAttackRelease("C1", "8n", t);
-}, "4n");
-
-// 2. I TRIGGER (Suoni al volo)
-const snare = new Tone.NoiseSynth().toDestination();
-window.dinoTriggers.hitSnare = () => snare.triggerAttackRelease("16n");
-
-const fx = new Tone.MetalSynth().toDestination();
-window.dinoTriggers.magicFX = () => fx.triggerAttackRelease("1n");
+Tone.getTransport().scheduleRepeat(t => kick.triggerAttackRelease("C1", "8n", t), "4n");
 
 Tone.getTransport().bpm.value = 124;
 Tone.getTransport().start();
@@ -45,13 +35,11 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  
   const [loopTracks, setLoopTracks] = useState<string[]>([]);
   const [triggerSuoni, setTriggerSuoni] = useState<string[]>([]);
   const [mutedLoops, setMutedLoops] = useState<{ [key: string]: boolean }>({});
   const [errorLog, setErrorLog] = useState<string | null>(null);
   
-  const [isCodeOpen, setIsCodeOpen] = useState(false);
   const codeRef = useRef<string>(DEFAULT_CODE);
 
   useEffect(() => {
@@ -85,7 +73,7 @@ function App() {
       
       setTimeout(scanPerformanceRack, 200);
     } catch (err: any) {
-      setErrorLog(err.message || "Errore");
+      setErrorLog(err.message || "Errore di esecuzione");
     }
   };
 
@@ -94,17 +82,8 @@ function App() {
     if (channel) {
       const isMuted = !mutedLoops[name];
       channel.mute = isMuted;
-      setMutedTracks(name, isMuted);
+      setMutedLoops(prev => ({ ...prev, [name]: isMuted }));
     }
-  };
-
-  const setMutedTracks = (name: string, isMuted: boolean) => {
-    setMutedLoops(prev => ({ ...prev, [name]: isMuted }));
-  }
-
-  const fireTrigger = (name: string) => {
-    const triggerFunc = window.dinoTriggers?.[name];
-    if (triggerFunc) triggerFunc();
   };
 
   const handleAiGenerate = async () => {
@@ -121,16 +100,12 @@ function App() {
       });
       const data = await response.json();
       if (data.code) {
-        const newMsgs: Message[] = [
-          { role: 'user', content: currentPrompt },
-          { role: 'assistant', content: "OK" }
-        ];
-        setHistory(prev => [...prev, ...newMsgs].slice(-6));
+        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "OK" }].slice(-6));
         setCode(data.code);
         await executeCode(data.code);
       }
     } catch (err) {
-      setErrorLog("AI Offline");
+      setErrorLog("AI connection lost");
     } finally {
       setIsGenerating(false);
     }
@@ -143,23 +118,24 @@ function App() {
           <motion.div className="overlay" exit={{ opacity: 0 }} onClick={startAudioEngine}>
             <div className="start-card">
               <Zap size={50} color="var(--matrix-green)" />
-              <h2>LIVE PERFORMER</h2>
-              <p>Clicca per iniziare</p>
+              <h2>DINO PERFORMANCE OS</h2>
+              <p>Clicca per inizializzare il sistema</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <header>
-        <div className="brand">DINO.PRO</div>
+        <div className="brand">DINO.PRO <span style={{fontSize:'0.6rem', opacity:0.5}}>v4.1</span></div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {errorLog && <AlertCircle color="#ff3131" size={18} />}
           <div className="dot pulse" />
         </div>
       </header>
 
+      {/* RACK PERFORMANCE - Top priority for interaction */}
       <div className="rack">
-        <div className="rack-label"><Radio size={10} /> Mixer Loop</div>
+        <div className="rack-label"><Radio size={10} /> Live Mixer</div>
         <div className="mixer-scroll">
           {loopTracks.map(t => (
             <div key={t} className={`track-btn ${mutedLoops[t] ? 'muted' : 'active'}`} onClick={() => toggleLoop(t)}>
@@ -167,16 +143,18 @@ function App() {
               <div className="track-name">{t}</div>
             </div>
           ))}
+          {loopTracks.length === 0 && <div className="placeholder-text">Nessun loop...</div>}
         </div>
 
-        <div className="rack-label" style={{ marginTop: '10px' }}><Zap size={10} /> One-Shot Triggers</div>
+        <div className="rack-label" style={{ marginTop: '10px' }}><Zap size={10} /> Instant Triggers</div>
         <div className="mixer-scroll">
           {triggerSuoni.map(t => (
-            <div key={t} className="trigger-btn" onClick={() => fireTrigger(t)}>
+            <div key={t} className="trigger-btn" onClick={() => window.dinoTriggers[t]()}>
               <Play size={16} fill="currentColor" />
               <div className="track-name">{t}</div>
             </div>
           ))}
+          {triggerSuoni.length === 0 && <div className="placeholder-text">Nessun trigger...</div>}
         </div>
       </div>
 
@@ -184,13 +162,13 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Evolvi la performance..."
+            placeholder="Comando neurale (es. 'Aggiungi una snare techno', 'Crea un trigger crash')..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "SYCHING..." : "EVOLVI PERFORMANCE"}
+              {isGenerating ? "CODIFICA IN CORSO..." : "EVOLVI SISTEMA"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={18} /></button>
             <button className="btn-icon" style={{ borderColor: '#ff3131', color: '#ff3131' }} onClick={() => Tone.getTransport().stop()}>
@@ -200,23 +178,29 @@ function App() {
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-header" style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between' }} onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Code2 size={14} /> Source</div>
-          <div style={{ fontSize: '0.6rem' }}>{isCodeOpen ? 'HIDE' : 'SHOW'}</div>
+      {/* CODE VIEW - Visible below prompt for direct feedback */}
+      <section className="panel code-preview-panel">
+        <div className="panel-header" style={{ padding: '0.4rem 1rem' }}>
+          <div className="panel-title" style={{fontSize: '0.65rem'}}><Terminal size={12} /> Kernell Code Output</div>
         </div>
-        <AnimatePresence>
-          {isCodeOpen && (
-            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
-              <textarea className="code-area" value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <textarea 
+          className="code-area" 
+          value={code} 
+          onChange={(e) => setCode(e.target.value)} 
+          spellCheck={false}
+          style={{ height: '220px', fontSize: '0.7rem', border: 'none', background: 'rgba(0,0,0,0.2)' }}
+        />
       </section>
 
+      {errorLog && (
+        <div className="error-box" style={{ marginTop: '5px' }}>
+          <AlertCircle size={14} /> {errorLog}
+        </div>
+      )}
+
       <div className="status-bar">
-        <div>CORE: DINO-PRO_v4</div>
-        <div>LOOPS: {loopTracks.length} // TRIG: {triggerSuoni.length}</div>
+        <div>STATUS: {isGenerating ? 'GEN_MODE' : 'STABLE'}</div>
+        <div>MEM: {Math.floor(Math.random() * 50) + 120}MB // DSP: {isPlaying ? 'ACTIVE' : 'IDLE'}</div>
       </div>
     </div>
   )
