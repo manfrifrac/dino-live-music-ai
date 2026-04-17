@@ -3,7 +3,7 @@ import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Play, Square, ChevronDown, ChevronUp, 
-  Code2, History, Volume2, VolumeX, RefreshCcw
+  Code2, Volume2, VolumeX, RefreshCcw
 } from 'lucide-react'
 import './App.css'
 
@@ -53,7 +53,6 @@ function App() {
   const [mutedTracks, setMutedTracks] = useState<{ [key: string]: boolean }>({});
   
   const [isCodeOpen, setIsCodeOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const codeRef = useRef<string>(DEFAULT_CODE);
   const historyRef = useRef<Message[]>([]);
@@ -66,7 +65,6 @@ function App() {
   const updateMixerUI = () => {
     if (window.dinoChannels) {
       const foundTracks = Object.keys(window.dinoChannels);
-      console.log("Mixer aggiornato, tracce trovate:", foundTracks);
       setTracks(foundTracks);
     }
   };
@@ -74,27 +72,22 @@ function App() {
   const executeCode = async (codeToRun: string) => {
     await Tone.start();
     try {
-      // 1. Fermiamo tutto
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
-      
-      // 2. Pulizia totale
       window.dinoChannels = {};
       setTracks([]);
-      setMutedTracks({}); // Reset fondamentale del mute
+      setMutedTracks({});
       
-      // 3. Esecuzione nuovo codice
       const func = new Function('Tone', codeToRun);
       func(Tone);
       
-      // 4. Scansione canali con piccolo delay per sicurezza
       setTimeout(() => {
         updateMixerUI();
       }, 100);
       
       setIsPlaying(true);
     } catch (err) {
-      console.error("Exec error:", err);
+      console.error(err);
     }
   };
 
@@ -102,7 +95,7 @@ function App() {
     const channel = window.dinoChannels?.[trackName];
     if (channel) {
       const newMuteState = !mutedTracks[trackName];
-      channel.mute = newMuteState; // Imposta il mute reale su Tone.js
+      channel.mute = newMuteState;
       setMutedTracks(prev => ({ ...prev, [trackName]: newMuteState }));
     }
   };
@@ -126,7 +119,11 @@ function App() {
       
       const data = await response.json();
       if (data.code) {
-        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "OK" }].slice(-10));
+        const newMsgs: Message[] = [
+          { role: 'user', content: currentPrompt },
+          { role: 'assistant', content: "OK" }
+        ];
+        setHistory(prev => [...prev, ...newMsgs].slice(-10));
         setCode(data.code);
         await executeCode(data.code);
       }
@@ -146,15 +143,14 @@ function App() {
         </button>
       </header>
 
-      {/* Mixer Section */}
       <div className="mixer-container">
         {tracks.length === 0 ? (
-          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Configurazione canali...</div>
+          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Avvia un nucleo audio...</div>
         ) : (
           tracks.map(track => (
             <motion.div 
               key={track}
-              whileTap={{ scale: 0.9 }}
+              whileTap={{ scale: 0.95 }}
               className={`track-btn ${mutedTracks[track] ? 'muted' : 'active'}`}
               onClick={() => toggleMute(track)}
             >
