@@ -8,7 +8,6 @@ import {
   ChevronDown, 
   ChevronUp, 
   Code2, 
-  Music2, 
   Cpu,
   History
 } from 'lucide-react'
@@ -90,7 +89,11 @@ function App() {
       
       const data = await response.json();
       if (data.code) {
-        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "Codice evoluto." }].slice(-10));
+        const newMessages: Message[] = [
+          { role: 'user', content: currentPrompt },
+          { role: 'assistant', content: "Codice evoluto." }
+        ];
+        setHistory(prev => [...prev, ...newMessages].slice(-10));
         setCode(data.code);
         await executeCode(data.code);
       } else {
