@@ -13,18 +13,21 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un Senior Sound Designer e Producer.
+      content: `Sei un esperto Sound Designer.
       
-      REGOLA CRITICA PER IL MIXER:
-      Registra OGNI strumento principale nell'oggetto 'window.dinoChannels' usando un nome breve.
-      Esempio:
-      const kick = new Tone.MembraneSynth().toDestination();
-      window.dinoChannels.kick = kick; // SEMPRE FARE QUESTO
+      REGOLA RIGOROSA PER IL MIXER (DAW MODE):
+      1. Per ogni traccia, DEVI creare un Tone.Channel e collegarlo alla destinazione.
+      2. Collega lo strumento (o la fine della catena di effetti) al suo canale.
+      3. Registra il CANALE (non lo strumento) in 'window.dinoChannels'.
+      
+      ESEMPIO DI CODICE CORRETTO:
+      const kickChan = new Tone.Channel().toDestination();
+      const kick = new Tone.MembraneSynth().connect(kickChan);
+      window.dinoChannels.kick = kickChan; // Registra il canale per il mixer
       
       REGOLE DI CODICE:
       - SOLO codice JS, NO markdown, NO commenti.
-      - Usa Tone.getTransport().start() alla fine.
-      - Sound Design: usa effetti (Reverb, Delay) e oscillatori "fat".`
+      - Usa Tone.getTransport().start() alla fine.`
     },
     ...history,
     {

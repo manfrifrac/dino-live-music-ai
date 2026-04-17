@@ -7,25 +7,26 @@ import {
 } from 'lucide-react'
 import './App.css'
 
-// Estendiamo l'oggetto window per i canali personalizzati
 declare global {
   interface Window {
     dinoChannels: { [key: string]: any };
   }
 }
 
-const DEFAULT_CODE = `// Dino-Live OS - Mixer Edition
+const DEFAULT_CODE = `// Dino-Live OS - Mixer Edition FIX
 window.dinoChannels = {}; // Reset mixer
 
-const masterReverb = new Tone.Reverb(2).toDestination();
+// Canali mixer dedicati
+const kickChan = new Tone.Channel().toDestination();
+const leadChan = new Tone.Channel().toDestination();
 
-const kick = new Tone.MembraneSynth().toDestination();
-window.dinoChannels.kick = kick;
+// Strumenti collegati ai canali
+const kick = new Tone.MembraneSynth().connect(kickChan);
+const lead = new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: "fatsawtooth" } }).connect(leadChan);
 
-const lead = new Tone.PolySynth(Tone.MonoSynth, {
-  oscillator: { type: "fatsawtooth" }
-}).connect(masterReverb);
-window.dinoChannels.lead = lead;
+// Registrazione per interfaccia mixer
+window.dinoChannels.kick = kickChan;
+window.dinoChannels.lead = leadChan;
 
 const loop = new Tone.Loop(t => {
   lead.triggerAttackRelease(["C3", "Eb3", "G3"], "4n", t);
@@ -72,8 +73,6 @@ function App() {
     try {
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
-      
-      // Reset canali su window
       window.dinoChannels = {};
       
       const func = new Function('Tone', codeToRun);
@@ -87,9 +86,11 @@ function App() {
   };
 
   const toggleMute = (trackName: string) => {
-    if (window.dinoChannels && window.dinoChannels[trackName]) {
+    const channel = window.dinoChannels?.[trackName];
+    if (channel) {
       const isMuted = !mutedTracks[trackName];
-      window.dinoChannels[trackName].mute = isMuted;
+      // Tone.Channel ha la proprietà 'mute'
+      channel.mute = isMuted;
       setMutedTracks(prev => ({ ...prev, [trackName]: isMuted }));
     }
   };
@@ -115,7 +116,6 @@ function App() {
       if (data.code) {
         const assistantMsg: Message = { role: 'assistant', content: "Mixer aggiornato." };
         const userMsg: Message = { role: 'user', content: currentPrompt };
-        
         setHistory(prev => [...prev, userMsg, assistantMsg].slice(-10));
         setCode(data.code);
         await executeCode(data.code);
@@ -133,13 +133,13 @@ function App() {
         <div className="brand">DINO.MIXER</div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <div className={`dot ${isPlaying ? 'pulse' : ''}`} />
-          <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>DAW_MODE</span>
+          <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>FIX_MIX_ACTIVE</span>
         </div>
       </header>
 
       <div className="mixer-container">
         {tracks.length === 0 ? (
-          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Scansionando canali...</div>
+          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Premi 'Esegui' per caricare il mixer...</div>
         ) : (
           tracks.map(track => (
             <motion.div 
@@ -160,13 +160,13 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Componi (es. 'Aggiungi hi-hat', 'Togli kick')"
+            placeholder="Chiedi: 'Cambia solo il lead', 'Rendi il kick più potente'..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "PRODUCENDO..." : "AGGIORNA MIX"}
+              {isGenerating ? "PRODUCENDO..." : "EVOLVI MIX"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={20} /></button>
             <button className="btn-icon btn-stop" onClick={() => { Tone.getTransport().stop(); setIsPlaying(false); }}><Square size={20} /></button>
@@ -208,7 +208,7 @@ function App() {
 
       <div className="status-bar">
         <div>TRACKS: {tracks.length}</div>
-        <div>AUDIO: 48KHZ</div>
+        <div>MIXER: CHANNEL_MODE</div>
       </div>
     </div>
   )
