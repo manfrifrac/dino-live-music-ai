@@ -13,16 +13,37 @@ import {
 } from 'lucide-react'
 import './App.css'
 
-const DEFAULT_CODE = `// Dino-Live OS v2026.4
-const synth = new Tone.PolySynth(Tone.Synth).toDestination();
-const filter = new Tone.Filter(2000, "lowpass").toDestination();
-synth.connect(filter);
+const DEFAULT_CODE = `// Dino-Live Matrix 2026 - High Fidelity Sound Design
+// Catena di effetti globale per un suono ricco
+const masterReverb = new Tone.Reverb(2.5).toDestination();
+const masterDelay = new Tone.FeedbackDelay("8n", 0.4).connect(masterReverb);
 
+// Synth principale - PolySynth con oscillatore "fat"
+const lead = new Tone.PolySynth(Tone.MonoSynth, {
+  oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
+  envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 1.5 },
+  filter: { q: 1, type: "lowpass", rolloff: -24 },
+  filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.5, baseFrequency: 200, octaves: 4 }
+}).connect(masterDelay);
+
+// Kick Drum profondo
+const kick = new Tone.MembraneSynth({
+  pitchDecay: 0.05,
+  octaves: 10,
+  oscillator: { type: "sine" }
+}).toDestination();
+
+// Loop Armonico (Chord progression)
 const loop = new Tone.Loop((time) => {
-  synth.triggerAttackRelease(["E2", "E3"], "16n", time);
-}, "8n").start(0);
+  lead.triggerAttackRelease(["C3", "G3", "Bb3", "F4"], "2n", time);
+}, "1n").start(0);
 
-Tone.getTransport().bpm.value = 124;
+// Kick sul beat
+const kickLoop = new Tone.Loop((time) => {
+  kick.triggerAttackRelease("C1", "8n", time);
+}, "4n").start(0);
+
+Tone.getTransport().bpm.value = 110;
 Tone.getTransport().start();
 `;
 
@@ -38,7 +59,6 @@ function App() {
   const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Panel States
   const [isCodeOpen, setIsCodeOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
@@ -62,7 +82,7 @@ function App() {
       
       setTimeout(() => {
         Tone.getDestination().mute = false;
-      }, 60);
+      }, 70);
       setIsPlaying(true);
     } catch (err) {
       console.error(err);
@@ -91,7 +111,7 @@ function App() {
       if (data.code) {
         const newMessages: Message[] = [
           { role: 'user', content: currentPrompt },
-          { role: 'assistant', content: "Codice evoluto." }
+          { role: 'assistant', content: "Sound Design migliorato." }
         ];
         setHistory(prev => [...prev, ...newMessages].slice(-10));
         setCode(data.code);
@@ -112,20 +132,19 @@ function App() {
         <div className="brand">DINO.OS</div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <div className={`dot ${isPlaying ? 'pulse' : ''}`} />
-          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>2026.REL_4</span>
+          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>AUDIO_HI-FI</span>
         </div>
       </header>
 
-      {/* Main Prompt Panel - Always Open/Prominent */}
       <section className="panel prompt-panel">
         <div className="panel-header">
-          <div className="panel-title"><Sparkles size={18} /> Comando Neurale</div>
+          <div className="panel-title"><Sparkles size={18} /> Produzione IA</div>
           <Cpu size={16} style={{ opacity: 0.5 }} />
         </div>
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Cosa vuoi creare? (es. 'Aggiungi una batteria techno', 'Sposta tutto in Re minore', 'Rendi il suono più acido')"
+            placeholder="Descrivi il suono che desideri (es. 'Fai un basso acido techno', 'Crea una melodia celestiale', 'Dacci un beat hip hop sporco')..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             disabled={isGenerating}
@@ -136,7 +155,7 @@ function App() {
               onClick={handleAiGenerate}
               disabled={isGenerating || !prompt.trim()}
             >
-              {isGenerating ? "ELABORAZIONE..." : "EVOLVI TRACCIA"}
+              {isGenerating ? "PRODUCENDO..." : "GENERA SOUND DESIGN"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}>
               <Play size={20} />
@@ -152,10 +171,9 @@ function App() {
         </div>
       </section>
 
-      {/* Code Editor Panel - Collapsible */}
       <section className="panel">
         <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Code2 size={18} /> Sorgente Nucleo</div>
+          <div className="panel-title"><Code2 size={18} /> Studio Rack</div>
           {isCodeOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
         <AnimatePresence>
@@ -177,10 +195,9 @@ function App() {
         </AnimatePresence>
       </section>
 
-      {/* History Panel - Collapsible */}
       <section className="panel">
         <div className="panel-header" onClick={() => setIsHistoryOpen(!isHistoryOpen)}>
-          <div className="panel-title"><History size={18} /> Log Evoluzione</div>
+          <div className="panel-title"><History size={18} /> Session Log</div>
           {isHistoryOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
         <AnimatePresence>
@@ -193,7 +210,7 @@ function App() {
               className="panel-content"
               style={{ fontSize: '0.8rem', opacity: 0.8 }}
             >
-              {history.length === 0 ? "Nessun log disponibile." : history.filter(h => h.role === 'user').map((h, i) => (
+              {history.length === 0 ? "In attesa di istruzioni sonore." : history.filter(h => h.role === 'user').map((h, i) => (
                 <div key={i} style={{ marginBottom: '5px' }}>
                   <span style={{ color: 'var(--matrix-green)' }}>&gt;</span> {h.content}
                 </div>
@@ -204,8 +221,8 @@ function App() {
       </section>
 
       <div className="status-bar">
-        <div>STATUS: {isGenerating ? 'SYNCING' : 'READY'}</div>
-        <div>MEM: 4.2GB // AUDIO: 44.1KHZ</div>
+        <div>AUDIO: 24-BIT // DSP: HIGH</div>
+        <div>SAMP RATE: 48KHZ // SYNC: INTERNAL</div>
       </div>
     </div>
   )
