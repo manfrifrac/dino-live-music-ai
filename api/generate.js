@@ -3,39 +3,34 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, currentCode, history = [] } = req.body;
+  const { prompt, currentGrid, mode } = req.body;
   const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'Chiave API Groq non configurata' });
+    return res.status(500).json({ error: 'Groq API Key not configured' });
   }
 
-  const messages = [
-    {
-      role: "system",
-      content: `Sei il Kernel di Dino-Sampler.
-      
-      NUOVA FUNZIONE CAMPIONATORE:
-      - L'utente può registrare audio. L'URL del campione è in 'window.dinoSampleUrl'.
-      - Se l'utente chiede di usare il suo campione, DEVI usare Tone.Sampler.
-      - Esempio: 
-        const sChan = new Tone.Channel().toDestination();
-        const sampler = new Tone.Sampler({ urls: { C4: window.dinoSampleUrl } }).connect(sChan);
-        window.dinoChannels.sampler = sChan;
-        window.dinoTriggers.play = () => sampler.triggerAttackRelease("C4", "1n");
-
-      REGOLE DI OUTPUT:
-      1. Restituisci SEMPRE codice COMPLETO.
-      2. Includi SEMPRE inizializzazione canali, loop e trigger.
-      3. Se usi il campionatore, assicurati che window.dinoSampleUrl esista nel codice (if check).
-      4. Rispondi SOLO con codice JS puro.`
-    },
-    ...history,
-    {
-      role: "user",
-      content: `Codice attuale:\n${currentCode}\n\nRichiesta evoluzione:\n${prompt}`
-    }
-  ];
+  // --- LOGICA DINO.DAW (JSON DATA GENERATION) ---
+  const systemPrompt = `Sei l'Assistente di Produzione Musicale di DINO.DAW.
+  L'utente ha un sequencer a 16 step con 4 tracce: kick, snare, hihat, bass.
+  
+  IL TUO COMPITO:
+  Riceverai la griglia attuale e un prompt dell'utente. 
+  Devi restituire un oggetto JSON che rappresenti la NUOVA griglia completa (16 step per ogni traccia).
+  
+  REGOLE:
+  1. Restituisci SOLO il JSON. Niente testo, niente spiegazioni.
+  2. La struttura deve essere:
+     {
+       "newGrid": {
+         "kick": [false, false, ...], // 16 valori
+         "snare": [false, false, ...],
+         "hihat": [false, false, ...],
+         "bass": [false, false, ...]
+       }
+     }
+  3. Sii creativo musicalmente. Se l'utente chiede "techno", metti il kick su 0, 4, 8, 12.
+  4. Mantieni la struttura ritmica coerente (4/4).`;
 
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -45,17 +40,23 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        messages: messages,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Griglia Attuale: ${JSON.stringify(currentGrid)}\n\nPrompt: ${prompt}` }
+        ],
         model: "llama-3.3-70b-versatile",
-        temperature: 0.4,
+        temperature: 0.5,
+        response_format: { type: "json_object" }
       })
     });
 
     const data = await response.json();
-    let generatedCode = data.choices[0]?.message?.content || "";
-    generatedCode = generatedCode.replace(/```javascript/g, "").replace(/```/g, "").trim();
-    res.status(200).json({ code: generatedCode });
+    const content = data.choices[0]?.message?.content;
+    const parsed = JSON.parse(content);
+
+    res.status(200).json(parsed);
   } catch (error) {
-    res.status(500).json({ error: "Errore Kernel" });
+    console.error(error);
+    res.status(500).json({ error: "Errore nella generazione del pattern" });
   }
 }

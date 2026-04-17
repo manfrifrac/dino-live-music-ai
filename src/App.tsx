@@ -2,232 +2,200 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Zap, Radio, Terminal, Power, Mic, Circle
+  Play, Square, Radio, Zap, Cpu, Keyboard as KeyboardIcon, Activity
 } from 'lucide-react'
 import './App.css'
 
-declare global {
-  interface Window {
-    dinoChannels: { [key: string]: any };
-    dinoTriggers: { [key: string]: Function };
-    dinoLoops: { [key: string]: any };
-    dinoSampleUrl: string | null;
-  }
-}
+// --- CONFIGURAZIONE STRUMENTI FISSI ---
+const TRACKS = ['kick', 'snare', 'hihat', 'bass'] as const;
+type TrackName = typeof TRACKS[number];
 
-const DEFAULT_CODE = `// Dino-Live Sampler OS
-window.dinoChannels = {}; 
-window.dinoTriggers = {};
-window.dinoLoops = {};
-
-if (window.dinoSampleUrl) {
-  const samplerChan = new Tone.Channel().toDestination();
-  const sampler = new Tone.Sampler({
-    urls: { C4: window.dinoSampleUrl },
-    onload: () => console.log("Campione caricato!")
-  }).connect(samplerChan);
-  
-  window.dinoChannels.sampler = samplerChan;
-  window.dinoTriggers.play_sample = () => sampler.triggerAttackRelease("C4", "1n");
-}
-
-Tone.getTransport().start();
-`;
-
-interface Message { role: 'user' | 'assistant'; content: string; }
+const STEPS = 16;
 
 function App() {
-  const [code, setCode] = useState(DEFAULT_CODE);
   const [isAudioStarted, setIsAudioStarted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentStep, setCurrentStep] = useState(-1);
+  const [bpm, setBpm] = useState(124);
+  
+  // STATO DEL SEQUENCER
+  const [grid, setGrid] = useState<Record<TrackName, boolean[]>>({
+    kick: Array(STEPS).fill(false),
+    snare: Array(STEPS).fill(false),
+    hihat: Array(STEPS).fill(false),
+    bass: Array(STEPS).fill(false),
+  });
+
   const [prompt, setPrompt] = useState("");
-  const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loopNames, setLoopNames] = useState<string[]>([]);
-  const [triggerNames, setTriggerNames] = useState<string[]>([]);
-  const [activeLoops, setActiveLoops] = useState<{ [key: string]: boolean }>({});
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const [isCodeOpen, setIsCodeOpen] = useState(false);
-  const codeRef = useRef<string>(DEFAULT_CODE);
 
-  useEffect(() => {
-    codeRef.current = code;
-  }, [code]);
+  // Riferimenti persistenti per Tone.js
+  const instrumentsRef = useRef<Partial<Record<TrackName, any>>>({});
+  const sequencerRef = useRef<Tone.Sequence | null>(null);
 
-  const syncUI = () => {
-    if (window.dinoLoops) {
-      setLoopNames(Object.keys(window.dinoLoops));
-      const activeState: any = {};
-      Object.keys(window.dinoLoops).forEach(k => {
-        activeState[k] = window.dinoLoops[k].state === "started";
-      });
-      setActiveLoops(activeState);
-    }
-    if (window.dinoTriggers) setTriggerNames(Object.keys(window.dinoTriggers));
-  };
-
-  const startAudioEngine = async () => {
+  // Inizializzazione Audio Engine
+  const initEngine = async () => {
     await Tone.start();
+    
+    // Setup Strumenti
+    const kick = new Tone.MembraneSynth().toDestination();
+    const snare = new Tone.NoiseSynth({
+      envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
+    }).toDestination();
+    const hihat = new Tone.MetalSynth({
+      envelope: { attack: 0.001, decay: 0.1, sustain: 0 }
+    }).toDestination();
+    const bass = new Tone.MonoSynth({
+      oscillator: { type: "sawtooth" },
+      envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 0.8 }
+    }).toDestination();
+
+    instrumentsRef.current = { kick, snare, hihat, bass };
+
+    // Setup Sequencer
+    sequencerRef.current = new Tone.Sequence((time, step) => {
+      setCurrentStep(step);
+      
+      // Controlla la griglia e suona
+      TRACKS.forEach(track => {
+        if (gridRef.current[track][step]) {
+          if (track === 'kick') instrumentsRef.current.kick?.triggerAttackRelease("C1", "8n", time);
+          if (track === 'snare') instrumentsRef.current.snare?.triggerAttackRelease("16n", time);
+          if (track === 'hihat') instrumentsRef.current.hihat?.triggerAttackRelease("32n", time);
+          if (track === 'bass') instrumentsRef.current.bass?.triggerAttackRelease("C2", "8n", time);
+        }
+      });
+    }, Array.from({length: STEPS}, (_, i) => i), "16n");
+
     setIsAudioStarted(true);
-    executeCode(codeRef.current);
   };
 
-  const executeCode = async (codeToRun: string) => {
-    try {
-      Tone.getDestination().volume.rampTo(-Infinity, 0.05);
-      setTimeout(() => {
-        Tone.getTransport().stop();
-        Tone.getTransport().cancel();
-        if (window.dinoLoops) Object.values(window.dinoLoops).forEach((l: any) => l.dispose());
-        window.dinoChannels = {};
-        window.dinoTriggers = {};
-        window.dinoLoops = {};
-        const func = new Function('Tone', codeToRun);
-        func(Tone);
-        Tone.getDestination().volume.rampTo(0, 0.1);
-        setTimeout(syncUI, 200);
-      }, 60);
-    } catch (err: any) {
-      console.error(err);
-      Tone.getDestination().volume.rampTo(0, 0.1);
-    }
-  };
+  // Sincronizzazione griglia per il sequencer (useRef per evitare closure obsolete)
+  const gridRef = useRef(grid);
+  useEffect(() => { gridRef.current = grid; }, [grid]);
 
-  const toggleRecording = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
+  const toggleTransport = () => {
+    if (isPlaying) {
+      Tone.getTransport().stop();
+      setIsPlaying(false);
+      setCurrentStep(-1);
     } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        chunksRef.current = [];
-        mediaRecorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunksRef.current, { type: 'audio/ogg; codecs=opus' });
-          const url = URL.createObjectURL(blob);
-          window.dinoSampleUrl = url;
-          alert("Suono campionato! Ora chiedi all'IA di usarlo.");
-        };
-        mediaRecorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        alert("Permesso microfono negato.");
-      }
+      Tone.getTransport().start();
+      sequencerRef.current?.start(0);
+      setIsPlaying(true);
     }
+  };
+
+  const toggleStep = (track: TrackName, stepIndex: number) => {
+    setGrid(prev => ({
+      ...prev,
+      [track]: prev[track].map((val, i) => i === stepIndex ? !val : val)
+    }));
   };
 
   const handleAiGenerate = async () => {
     if (!prompt || isGenerating) return;
-    const currentPrompt = prompt;
-    setPrompt("");
     setIsGenerating(true);
 
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: currentPrompt, currentCode: codeRef.current, history }),
+        body: JSON.stringify({ 
+          prompt, 
+          currentGrid: grid,
+          mode: 'daw' 
+        }),
       });
+      
       const data = await response.json();
-      if (data.code) {
-        const userMsg: Message = { role: 'user', content: currentPrompt };
-        const assistantMsg: Message = { role: 'assistant', content: "OK" };
-        setHistory(prev => [...prev, userMsg, assistantMsg].slice(-6));
-        setCode(data.code);
-        await executeCode(data.code);
+      if (data.newGrid) {
+        setGrid(data.newGrid);
+        setPrompt("");
+      } else if (data.error) {
+        alert(data.error);
       }
     } catch (err) {
-      console.error(err);
+      alert("AI Sync Error");
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="app-shell">
+    <div className="daw-shell">
       <AnimatePresence>
         {!isAudioStarted && (
-          <motion.div className="overlay" exit={{ opacity: 0 }} onClick={startAudioEngine}>
+          <motion.div className="overlay" exit={{ opacity: 0 }} onClick={initEngine}>
             <div className="start-card">
-              <Power size={50} color="var(--matrix-green)" />
-              <h2>DINO.SAMPLER v6</h2>
-              <p>Inizializza Motore Ibrido</p>
+              <Activity size={60} color="var(--matrix-green)" />
+              <h2>DINO.DAW 2026</h2>
+              <p>Inizializza Ambiente di Produzione</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <header>
-        <div className="brand">DINO.SAMPLER</div>
-        <button onClick={toggleRecording} className={`rec-btn ${isRecording ? 'recording' : ''}`}>
-          {isRecording ? <Circle fill="red" size={14} /> : <Mic size={14} />}
-          {isRecording ? 'STOP REC' : 'CAMPIONA'}
-        </button>
+        <div className="brand">DINO.DAW</div>
+        <div className="transport-bar">
+          <button className="btn-icon" onClick={toggleTransport}>
+            {isPlaying ? <Square fill="var(--matrix-green)" /> : <Play fill="var(--matrix-green)" />}
+          </button>
+          <div style={{ fontSize: '0.8rem' }}>BPM: {bpm}</div>
+        </div>
       </header>
 
-      <div className="rack">
-        <div className="rack-label">Loops</div>
-        <div className="mixer-scroll">
-          {loopNames.map(t => (
-            <div key={t} className={`track-btn ${activeLoops[t] ? 'active' : 'muted'}`} onClick={() => {
-              const loop = window.dinoLoops[t];
-              if (loop.state === "started") loop.stop(); else loop.start(0);
-              syncUI();
-            }}>
-              <Radio size={16} />
-              <div className="track-name">{t}</div>
+      {/* SEQUENCER GRID */}
+      <section className="sequencer-panel">
+        <div className="rack-label" style={{marginBottom:'10px'}}>Step Sequencer</div>
+        {TRACKS.map(track => (
+          <div key={track} className="sequencer-row">
+            <div className="track-label">{track}</div>
+            <div className="steps-container">
+              {grid[track].map((active, i) => (
+                <div 
+                  key={i} 
+                  className={`step ${active ? 'active' : ''} ${currentStep === i ? 'current' : ''}`}
+                  onClick={() => toggleStep(track, i)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-
-        <div className="rack-label" style={{marginTop:'8px'}}>Triggers</div>
-        <div className="mixer-scroll">
-          {triggerNames.map(t => (
-            <div key={t} className="trigger-btn" onClick={() => window.dinoTriggers[t]()}>
-              <Zap size={16} />
-              <div className="track-name">{t}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <section className="panel prompt-panel">
-        <div className="panel-content">
-          <textarea
-            className="main-prompt"
-            placeholder="Comanda l'IA..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <div className="action-bar">
-            <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "SYCHING..." : "EVOLVI"}
-            </button>
-            <button className="btn-icon" onClick={() => executeCode(code)}><Play size={18} /></button>
           </div>
-        </div>
+        ))}
       </section>
 
-      <section className="panel code-preview-panel">
-        <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Terminal size={12} /> Source Output</div>
-        </div>
-        {isCodeOpen && (
-          <textarea 
-            className="code-area" 
-            value={code} 
-            onChange={(e) => setCode(e.target.value)} 
-            spellCheck={false}
-          />
-        )}
+      {/* PIANO KEYBOARD */}
+      <div className="rack-label" style={{margin:'10px 0 5px 1rem'}}>Virtual Synth Keys</div>
+      <section className="keyboard-panel">
+        {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C2'].map((note, i) => (
+          <div 
+            key={i} 
+            className={`key ${note.includes('#') ? 'black' : 'white'}`}
+            onMouseDown={() => instrumentsRef.current.bass?.triggerAttack(note + "2")}
+            onMouseUp={() => instrumentsRef.current.bass?.triggerRelease()}
+          >
+            {note}
+          </div>
+        ))}
+      </section>
+
+      {/* AI ASSISTANT */}
+      <section className="ai-copilot">
+        <textarea
+          className="copilot-input"
+          placeholder="Dì all'IA cosa generare (es. 'Fai un ritmo techno', 'Pulisci snare', 'Crea un pattern trap')..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+        <button className="btn-generate" onClick={handleAiGenerate} disabled={isGenerating}>
+          {isGenerating ? "ELABORAZIONE PATTERN..." : "✨ GENERA BEAT CON IA"}
+        </button>
       </section>
 
       <div className="status-bar">
-        <div>DSP: READY</div>
-        <div>SAMPLES: {window.dinoSampleUrl ? '1' : '0'}</div>
+        <div>DAW_CORE_V1.0</div>
+        <div>BUFFER: OK // SYNC: INTERNAL</div>
       </div>
     </div>
   )
