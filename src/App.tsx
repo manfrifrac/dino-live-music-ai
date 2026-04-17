@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Zap, Radio, AlertCircle, Terminal, Power, Mic, Circle
+  Play, Zap, Radio, Terminal, Power, Mic, Circle
 } from 'lucide-react'
 import './App.css'
 
@@ -20,7 +20,6 @@ window.dinoChannels = {};
 window.dinoTriggers = {};
 window.dinoLoops = {};
 
-// Se hai registrato qualcosa, usalo!
 if (window.dinoSampleUrl) {
   const samplerChan = new Tone.Channel().toDestination();
   const sampler = new Tone.Sampler({
@@ -28,8 +27,8 @@ if (window.dinoSampleUrl) {
     onload: () => console.log("Campione caricato!")
   }).connect(samplerChan);
   
-  window.dinoChannels.mic_sample = samplerChan;
-  window.dinoTriggers.playSample = () => sampler.triggerAttackRelease("C4", "1n");
+  window.dinoChannels.sampler = samplerChan;
+  window.dinoTriggers.play_sample = () => sampler.triggerAttackRelease("C4", "1n");
 }
 
 Tone.getTransport().start();
@@ -43,17 +42,12 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  
   const [loopNames, setLoopNames] = useState<string[]>([]);
   const [triggerNames, setTriggerNames] = useState<string[]>([]);
   const [activeLoops, setActiveLoops] = useState<{ [key: string]: boolean }>({});
-  const [errorLog, setErrorLog] = useState<string | null>(null);
-  
-  // Recording State
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-
   const [isCodeOpen, setIsCodeOpen] = useState(false);
   const codeRef = useRef<string>(DEFAULT_CODE);
 
@@ -80,7 +74,6 @@ function App() {
   };
 
   const executeCode = async (codeToRun: string) => {
-    setErrorLog(null);
     try {
       Tone.getDestination().volume.rampTo(-Infinity, 0.05);
       setTimeout(() => {
@@ -96,12 +89,11 @@ function App() {
         setTimeout(syncUI, 200);
       }, 60);
     } catch (err: any) {
-      setErrorLog(err.message || "Errore");
+      console.error(err);
       Tone.getDestination().volume.rampTo(0, 0.1);
     }
   };
 
-  // Logic: Record Sample
   const toggleRecording = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
@@ -112,7 +104,6 @@ function App() {
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
         chunksRef.current = [];
-
         mediaRecorder.ondataavailable = (e) => chunksRef.current.push(e.data);
         mediaRecorder.onstop = () => {
           const blob = new Blob(chunksRef.current, { type: 'audio/ogg; codecs=opus' });
@@ -120,7 +111,6 @@ function App() {
           window.dinoSampleUrl = url;
           alert("Suono campionato! Ora chiedi all'IA di usarlo.");
         };
-
         mediaRecorder.start();
         setIsRecording(true);
       } catch (err) {
@@ -143,12 +133,14 @@ function App() {
       });
       const data = await response.json();
       if (data.code) {
-        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "Sampler pronto." }].slice(-6));
+        const userMsg: Message = { role: 'user', content: currentPrompt };
+        const assistantMsg: Message = { role: 'assistant', content: "OK" };
+        setHistory(prev => [...prev, userMsg, assistantMsg].slice(-6));
         setCode(data.code);
         await executeCode(data.code);
       }
     } catch (err) {
-      setErrorLog("AI offline");
+      console.error(err);
     } finally {
       setIsGenerating(false);
     }
@@ -161,7 +153,7 @@ function App() {
           <motion.div className="overlay" exit={{ opacity: 0 }} onClick={startAudioEngine}>
             <div className="start-card">
               <Power size={50} color="var(--matrix-green)" />
-              <h2>DINO.SAMPLER OS</h2>
+              <h2>DINO.SAMPLER v6</h2>
               <p>Inizializza Motore Ibrido</p>
             </div>
           </motion.div>
@@ -170,17 +162,14 @@ function App() {
 
       <header>
         <div className="brand">DINO.SAMPLER</div>
-        <button 
-          onClick={toggleRecording} 
-          className={`rec-btn ${isRecording ? 'recording' : ''}`}
-        >
+        <button onClick={toggleRecording} className={`rec-btn ${isRecording ? 'recording' : ''}`}>
           {isRecording ? <Circle fill="red" size={14} /> : <Mic size={14} />}
           {isRecording ? 'STOP REC' : 'CAMPIONA'}
         </button>
       </header>
 
       <div className="rack">
-        <div className="rack-label">Sequencer</div>
+        <div className="rack-label">Loops</div>
         <div className="mixer-scroll">
           {loopNames.map(t => (
             <div key={t} className={`track-btn ${activeLoops[t] ? 'active' : 'muted'}`} onClick={() => {
@@ -194,7 +183,7 @@ function App() {
           ))}
         </div>
 
-        <div className="rack-label" style={{marginTop:'8px'}}>Trigger Pads</div>
+        <div className="rack-label" style={{marginTop:'8px'}}>Triggers</div>
         <div className="mixer-scroll">
           {triggerNames.map(t => (
             <div key={t} className="trigger-btn" onClick={() => window.dinoTriggers[t]()}>
@@ -209,13 +198,13 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Es: 'Usa il mio campione per fare un basso cupo' o 'Crea una melodia celestiale'..."
+            placeholder="Comanda l'IA..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "ANALISI CAMPIONE..." : "EVOLVI PERFORMANCE"}
+              {isGenerating ? "SYCHING..." : "EVOLVI"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={18} /></button>
           </div>
@@ -224,7 +213,7 @@ function App() {
 
       <section className="panel code-preview-panel">
         <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Terminal size={12} /> Kernell Code Output</div>
+          <div className="panel-title"><Terminal size={12} /> Source Output</div>
         </div>
         {isCodeOpen && (
           <textarea 
@@ -237,7 +226,7 @@ function App() {
       </section>
 
       <div className="status-bar">
-        <div>STATUS: {isRecording ? 'RECORDING' : 'HYBRID_MODE'}</div>
+        <div>DSP: READY</div>
         <div>SAMPLES: {window.dinoSampleUrl ? '1' : '0'}</div>
       </div>
     </div>
