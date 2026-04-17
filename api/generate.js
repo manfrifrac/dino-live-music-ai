@@ -13,21 +13,21 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un esperto Sound Designer.
+      content: `Sei un esperto Sound Designer. 
       
-      REGOLA RIGOROSA PER IL MIXER (DAW MODE):
-      1. Per ogni traccia, DEVI creare un Tone.Channel e collegarlo alla destinazione.
-      2. Collega lo strumento (o la fine della catena di effetti) al suo canale.
-      3. Registra il CANALE (non lo strumento) in 'window.dinoChannels'.
+      REGOLA OBBLIGATORIA PER IL MIXER:
+      1. Per OGNI strumento creato, DEVI creare un canale separato.
+      2. Esempio:
+         const kickChan = new Tone.Channel().toDestination();
+         const kick = new Tone.MembraneSynth().connect(kickChan);
+         window.dinoChannels.kick = kickChan;
+         
+         const bassChan = new Tone.Channel().toDestination();
+         const bass = new Tone.MonoSynth().connect(bassChan);
+         window.dinoChannels.bass = bassChan;
       
-      ESEMPIO DI CODICE CORRETTO:
-      const kickChan = new Tone.Channel().toDestination();
-      const kick = new Tone.MembraneSynth().connect(kickChan);
-      window.dinoChannels.kick = kickChan; // Registra il canale per il mixer
-      
-      REGOLE DI CODICE:
-      - SOLO codice JS, NO markdown, NO commenti.
-      - Usa Tone.getTransport().start() alla fine.`
+      3. NON collegare mai due strumenti allo stesso canale in 'window.dinoChannels'.
+      4. Rispondi SOLO con codice JS, NO markdown.`
     },
     ...history,
     {
@@ -55,6 +55,6 @@ export default async function handler(req, res) {
     generatedCode = generatedCode.replace(/```javascript/g, "").replace(/```/g, "").trim();
     res.status(200).json({ code: generatedCode });
   } catch (error) {
-    res.status(500).json({ error: "Errore di rete" });
+    res.status(500).json({ error: "Errore" });
   }
 }

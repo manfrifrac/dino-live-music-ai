@@ -12,22 +12,26 @@ declare global {
   }
 }
 
-const DEFAULT_CODE = `// Dino-Live OS - FIX v3.1
+const DEFAULT_CODE = `// Dino-Live OS - Independent Channels FIX
 window.dinoChannels = {}; 
 
-const master = new Tone.Channel().toDestination();
-const kick = new Tone.MembraneSynth().connect(master);
-const synth = new Tone.PolySynth().connect(master);
+// Canale Kick INDIPENDENTE
+const kickChan = new Tone.Channel().toDestination();
+const kick = new Tone.MembraneSynth().connect(kickChan);
+window.dinoChannels.kick = kickChan;
 
-window.dinoChannels.kick = master;
-window.dinoChannels.synth = master;
+// Canale Synth INDIPENDENTE
+const synthChan = new Tone.Channel().toDestination();
+const synth = new Tone.PolySynth().connect(synthChan);
+window.dinoChannels.synth = synthChan;
 
-Tone.getTransport().scheduleRepeat((time) => {
-  kick.triggerAttackRelease("C1", "8n", time);
+// Pattern
+Tone.getTransport().scheduleRepeat((t) => {
+  kick.triggerAttackRelease("C1", "8n", t);
 }, "4n");
 
-Tone.getTransport().scheduleRepeat((time) => {
-  synth.triggerAttackRelease(["E3", "G3"], "16n", time);
+Tone.getTransport().scheduleRepeat((t) => {
+  synth.triggerAttackRelease(["E3", "G3"], "16n", t);
 }, "2n");
 
 Tone.getTransport().bpm.value = 120;
@@ -45,7 +49,6 @@ function App() {
   const [tracks, setTracks] = useState<string[]>([]);
   const [mutedTracks, setMutedTracks] = useState<{ [key: string]: boolean }>({});
   const [errorLog, setErrorLog] = useState<string | null>(null);
-  
   const [isCodeOpen, setIsCodeOpen] = useState(false);
 
   const codeRef = useRef<string>(DEFAULT_CODE);
@@ -75,6 +78,7 @@ function App() {
       Tone.getTransport().cancel();
       window.dinoChannels = {};
       setTracks([]);
+      setMutedTracks({}); // Reset stati mute al caricamento
       
       const func = new Function('Tone', codeToRun);
       func(Tone);
@@ -89,9 +93,9 @@ function App() {
   const toggleMute = (trackName: string) => {
     const channel = window.dinoChannels?.[trackName];
     if (channel) {
-      const newMuteState = !mutedTracks[trackName];
-      channel.mute = newMuteState;
-      setMutedTracks(prev => ({ ...prev, [trackName]: newMuteState }));
+      const currentMute = !mutedTracks[trackName];
+      channel.mute = currentMute;
+      setMutedTracks(prev => ({ ...prev, [trackName]: currentMute }));
     }
   };
 
@@ -131,18 +135,11 @@ function App() {
     <div className="app-shell">
       <AnimatePresence>
         {!isAudioStarted && (
-          <motion.div 
-            className="overlay" 
-            exit={{ opacity: 0 }}
-            onClick={startAudioEngine}
-          >
-            <motion.div 
-              initial={{ scale: 0.8 }} animate={{ scale: 1 }} 
-              className="start-card"
-            >
+          <motion.div className="overlay" exit={{ opacity: 0 }} onClick={startAudioEngine}>
+            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="start-card">
               <Play size={48} />
-              <h2>AVVIA NUCLEO AUDIO</h2>
-              <p>Clicca per sbloccare l'app</p>
+              <h2>AVVIA MIXER</h2>
+              <p>Clicca per iniziare la sessione</p>
             </motion.div>
           </motion.div>
         )}
@@ -178,13 +175,13 @@ function App() {
           )}
           <textarea
             className="main-prompt"
-            placeholder="Chiedi all'IA..."
+            placeholder="Aggiungi strumenti indipendenti..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="action-bar">
             <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
-              {isGenerating ? "SYCHING..." : "GENERA"}
+              {isGenerating ? "SYCHING..." : "EVOLVI"}
             </button>
             <button className="btn-icon" onClick={() => executeCode(code)}><Play size={20} /></button>
             <button className="btn-icon btn-stop" onClick={() => { Tone.getTransport().stop(); }}><Square size={20} /></button>
@@ -209,7 +206,8 @@ function App() {
       </section>
 
       <div className="status-bar">
-        <div>DINO.OS // READY</div>
+        <div>TRACKS: {tracks.length}</div>
+        <div>STABLE_v3.2</div>
       </div>
     </div>
   )
