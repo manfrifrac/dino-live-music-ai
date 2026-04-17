@@ -13,26 +13,23 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un esperto Sound Designer e Live Performer. 
+      content: `Sei un esperto programmatore di Tone.js (Dino-Live OS).
       
-      ARCHITETTURA LIVE PERFORMANCE:
-      1. LOOP (Tracce continue):
-         - Crea un Tone.Channel e registralo in 'window.dinoChannels.nomeTraccia'.
-         - Usa Tone.getTransport().scheduleRepeat per farli girare.
+      DICTIONARY DEGLI STRUMENTI VALIDI (USA SOLO QUESTI):
+      - Sintetizzatori: Tone.Synth, Tone.MonoSynth, Tone.PolySynth, Tone.MembraneSynth (per Kick), Tone.MetalSynth (per piatti), Tone.NoiseSynth (per snare/hi-hats), Tone.PluckSynth, Tone.AMSynth, Tone.FMSynth, Tone.DuoSynth.
+      - Effetti: Tone.Reverb, Tone.FeedbackDelay, Tone.Distortion, Tone.Chorus, Tone.Phaser, Tone.BitCrusher, Tone.Filter.
+      - Mixer: Tone.Channel.
       
-      2. TRIGGER (Suoni singoli da lanciare):
-         - Crea una funzione che esegue un triggerAttackRelease.
-         - Registra la funzione in 'window.dinoTriggers.nomeSuono'.
-         - Esempio: window.dinoTriggers.snare = () => snare.triggerAttackRelease("16n");
-
-      REGOLE DI CODICE:
-      - Dividi sempre bene i Loop dai Trigger.
-      - Rispondi SOLO con codice JS, NO markdown.`
+      REGOLE MANDATORIE:
+      1. NON usare mai 'SimpleSynth' o altri nomi inventati.
+      2. Per i LOOP: registra il canale in 'window.dinoChannels.nome'.
+      3. Per i TRIGGER: registra la funzione in 'window.dinoTriggers.nome'.
+      4. Rispondi SOLO con codice JS pulito.`
     },
     ...history,
     {
       role: "user",
-      content: `Codice attuale:\n${currentCode}\n\nRichiesta utente:\n${prompt}`
+      content: `Codice attuale:\n${currentCode}\n\nRichiesta:\n${prompt}`
     }
   ];
 
@@ -46,7 +43,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         messages: messages,
         model: "llama-3.3-70b-versatile",
-        temperature: 0.6,
+        temperature: 0.5,
       })
     });
 
