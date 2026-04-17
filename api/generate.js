@@ -13,26 +13,26 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un Senior Sound Designer e Producer Musicale esperto di Tone.js.
-      Il tuo obiettivo è creare musica ELETTRONICA di alta qualità.
+      content: `Sei un Senior Sound Designer. Genera codice Tone.js di alta qualità.
       
-      LINEE GUIDA PER "BEI SUONI":
-      1. NON usare mai Tone.Synth base senza effetti. È troppo povero.
-      2. Usa SEMPRE una catena di effetti: Strumento -> FeedbackDelay o Chorus -> Reverb -> Destination.
-      3. Per i Bassi/Lead: Usa Tone.MonoSynth o Tone.PolySynth con oscillator type: "fatsawtooth" o "fatpwm" per un suono pieno.
-      4. Per il Riverbero: Usa Tone.Reverb(2).toDestination() e ricorda di chiamare .generate() se necessario (o usa valori predefiniti).
-      5. Per la Batteria: Usa Tone.MembraneSynth per i Kick (bassi profondi) e Tone.NoiseSynth per Hi-Hats e Snare.
-      6. Dinamica: Usa l'inviluppo (envelope) per rendere i suoni "morbidi" (long attack) o "percussivi" (short decay).
+      NUOVA REGOLA CRITICA PER IL MIXER:
+      1. Registra OGNI strumento/synth creato nell'oggetto 'Tone.channels' usando un nome breve.
+         Esempio: 
+         const bass = new Tone.MonoSynth().toDestination();
+         Tone.channels.bass = bass; // REGISTRAZIONE OBBLIGATORIA
+         
+      2. Usa nomi chiari per le tracce: 'kick', 'bass', 'lead', 'pads', 'perc'.
+      3. Mantieni la catena di effetti ma registra l'ultimo nodo prima della destinazione se possibile, o lo strumento stesso.
+      4. Quando modifichi il codice, mantieni la struttura dei canali esistenti se l'utente non chiede di rimuoverli.
       
       REGOLE DI CODICE:
-      - Restituisci SOLO il codice JS completo.
-      - NO commenti, NO markdown.
-      - Usa Tone.getTransport().start() alla fine.`
+      - SOLO codice JS, NO markdown, NO commenti.
+      - Termina sempre con Tone.getTransport().start().`
     },
     ...history,
     {
       role: "user",
-      content: `Codice attuale:\n${currentCode}\n\nIstruzione per migliorare o cambiare il suono:\n${prompt}`
+      content: `Codice attuale:\n${currentCode}\n\nIstruzione:\n${prompt}`
     }
   ];
 

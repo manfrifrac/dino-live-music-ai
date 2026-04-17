@@ -2,55 +2,44 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Sparkles, 
-  Play, 
-  Square, 
-  ChevronDown, 
-  ChevronUp, 
-  Code2, 
-  Cpu,
-  History
+  Sparkles, Play, Square, ChevronDown, ChevronUp, 
+  Code2, Cpu, History, Volume2, VolumeX 
 } from 'lucide-react'
 import './App.css'
 
-const DEFAULT_CODE = `// Dino-Live Matrix 2026 - High Fidelity Sound Design
-// Catena di effetti globale per un suono ricco
-const masterReverb = new Tone.Reverb(2.5).toDestination();
-const masterDelay = new Tone.FeedbackDelay("8n", 0.4).connect(masterReverb);
+// Estendiamo il tipo Tone per includere il nostro registro canali
+declare module 'tone' {
+  interface ToneStatic {
+    channels: { [key: string]: any };
+  }
+}
 
-// Synth principale - PolySynth con oscillatore "fat"
+const DEFAULT_CODE = `// Dino-Live OS - Mixer Edition
+Tone.channels = {}; // Reset mixer
+
+const masterReverb = new Tone.Reverb(2).toDestination();
+
+const kick = new Tone.MembraneSynth().toDestination();
+Tone.channels.kick = kick;
+
 const lead = new Tone.PolySynth(Tone.MonoSynth, {
-  oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
-  envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 1.5 },
-  filter: { q: 1, type: "lowpass", rolloff: -24 },
-  filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.5, baseFrequency: 200, octaves: 4 }
-}).connect(masterDelay);
+  oscillator: { type: "fatsawtooth" }
+}).connect(masterReverb);
+Tone.channels.lead = lead;
 
-// Kick Drum profondo
-const kick = new Tone.MembraneSynth({
-  pitchDecay: 0.05,
-  octaves: 10,
-  oscillator: { type: "sine" }
-}).toDestination();
+const loop = new Tone.Loop(t => {
+  lead.triggerAttackRelease(["C3", "Eb3", "G3"], "4n", t);
+}, "2n").start(0);
 
-// Loop Armonico (Chord progression)
-const loop = new Tone.Loop((time) => {
-  lead.triggerAttackRelease(["C3", "G3", "Bb3", "F4"], "2n", time);
-}, "1n").start(0);
-
-// Kick sul beat
-const kickLoop = new Tone.Loop((time) => {
-  kick.triggerAttackRelease("C1", "8n", time);
+const kLoop = new Tone.Loop(t => {
+  kick.triggerAttackRelease("C1", "8n", t);
 }, "4n").start(0);
 
-Tone.getTransport().bpm.value = 110;
+Tone.getTransport().bpm.value = 120;
 Tone.getTransport().start();
 `;
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+interface Message { role: 'user' | 'assistant'; content: string; }
 
 function App() {
   const [code, setCode] = useState(DEFAULT_CODE);
@@ -58,6 +47,8 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [tracks, setTracks] = useState<string[]>([]);
+  const [mutedTracks, setMutedTracks] = useState<{ [key: string]: boolean }>({});
   
   const [isCodeOpen, setIsCodeOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -70,23 +61,36 @@ function App() {
     historyRef.current = history;
   }, [code, history]);
 
+  const updateMixerUI = () => {
+    if (Tone.channels) {
+      setTracks(Object.keys(Tone.channels));
+    }
+  };
+
   const executeCode = async (codeToRun: string) => {
     await Tone.start();
     try {
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
-      Tone.getDestination().mute = true;
+      
+      // Pulizia canali precedenti
+      Tone.channels = {};
       
       const func = new Function('Tone', codeToRun);
       func(Tone);
       
-      setTimeout(() => {
-        Tone.getDestination().mute = false;
-      }, 70);
+      updateMixerUI();
       setIsPlaying(true);
     } catch (err) {
       console.error(err);
-      Tone.getDestination().mute = false;
+    }
+  };
+
+  const toggleMute = (trackName: string) => {
+    if (Tone.channels[trackName]) {
+      const isMuted = !mutedTracks[trackName];
+      Tone.channels[trackName].mute = isMuted;
+      setMutedTracks(prev => ({ ...prev, [trackName]: isMuted }));
     }
   };
 
@@ -109,18 +113,12 @@ function App() {
       
       const data = await response.json();
       if (data.code) {
-        const newMessages: Message[] = [
-          { role: 'user', content: currentPrompt },
-          { role: 'assistant', content: "Sound Design migliorato." }
-        ];
-        setHistory(prev => [...prev, ...newMessages].slice(-10));
+        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "Mixer aggiornato." }].slice(-10));
         setCode(data.code);
         await executeCode(data.code);
-      } else {
-        alert(data.error || "Errore IA");
       }
     } catch (err) {
-      alert("Errore di rete");
+      alert("Errore AI");
     } finally {
       setIsGenerating(false);
     }
@@ -129,67 +127,60 @@ function App() {
   return (
     <div className="app-shell">
       <header>
-        <div className="brand">DINO.OS</div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="brand">DINO.MIXER</div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <div className={`dot ${isPlaying ? 'pulse' : ''}`} />
-          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>AUDIO_HI-FI</span>
+          <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>DAW_MODE_ON</span>
         </div>
       </header>
 
+      {/* Dynamic Mixer */}
+      <div className="mixer-container">
+        {tracks.length === 0 ? (
+          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Nessuna traccia rilevata...</div>
+        ) : (
+          tracks.map(track => (
+            <motion.div 
+              key={track}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className={`track-btn ${mutedTracks[track] ? 'muted' : 'active'}`}
+              onClick={() => toggleMute(track)}
+            >
+              {mutedTracks[track] ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              <div className="track-name">{track}</div>
+            </motion.div>
+          ))
+        )}
+      </div>
+
       <section className="panel prompt-panel">
-        <div className="panel-header">
-          <div className="panel-title"><Sparkles size={18} /> Produzione IA</div>
-          <Cpu size={16} style={{ opacity: 0.5 }} />
-        </div>
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Descrivi il suono che desideri (es. 'Fai un basso acido techno', 'Crea una melodia celestiale', 'Dacci un beat hip hop sporco')..."
+            placeholder="Cosa vuoi aggiungere al mix? (es. 'Aggiungi un hi-hat in levare', 'Togli il basso')"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            disabled={isGenerating}
           />
           <div className="action-bar">
-            <button 
-              className="btn-primary" 
-              onClick={handleAiGenerate}
-              disabled={isGenerating || !prompt.trim()}
-            >
-              {isGenerating ? "PRODUCENDO..." : "GENERA SOUND DESIGN"}
+            <button className="btn-primary" onClick={handleAiGenerate} disabled={isGenerating}>
+              {isGenerating ? "PRODUCENDO..." : "AGGIORNA MIX"}
             </button>
-            <button className="btn-icon" onClick={() => executeCode(code)}>
-              <Play size={20} />
-            </button>
-            <button className="btn-icon btn-stop" onClick={() => {
-              Tone.getTransport().stop();
-              Tone.getTransport().cancel();
-              setIsPlaying(false);
-            }}>
-              <Square size={20} />
-            </button>
+            <button className="btn-icon" onClick={() => executeCode(code)}><Play size={20} /></button>
+            <button className="btn-icon btn-stop" onClick={() => { Tone.getTransport().stop(); setIsPlaying(false); }}><Square size={20} /></button>
           </div>
         </div>
       </section>
 
       <section className="panel">
         <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Code2 size={18} /> Studio Rack</div>
-          {isCodeOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          <div className="panel-title"><Code2 size={16} /> Console Sorgente</div>
+          {isCodeOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
         <AnimatePresence>
           {isCodeOpen && (
-            <motion.div 
-              initial={{ height: 0 }}
-              animate={{ height: 'auto' }}
-              exit={{ height: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <textarea
-                className="code-area"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                spellCheck={false}
-              />
+            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}>
+              <textarea className="code-area" value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -197,21 +188,14 @@ function App() {
 
       <section className="panel">
         <div className="panel-header" onClick={() => setIsHistoryOpen(!isHistoryOpen)}>
-          <div className="panel-title"><History size={18} /> Session Log</div>
-          {isHistoryOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          <div className="panel-title"><History size={16} /> Timeline Log</div>
+          {isHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
         <AnimatePresence>
           {isHistoryOpen && (
-            <motion.div 
-              initial={{ height: 0 }}
-              animate={{ height: 'auto' }}
-              exit={{ height: 0 }}
-              transition={{ duration: 0.3 }}
-              className="panel-content"
-              style={{ fontSize: '0.8rem', opacity: 0.8 }}
-            >
-              {history.length === 0 ? "In attesa di istruzioni sonore." : history.filter(h => h.role === 'user').map((h, i) => (
-                <div key={i} style={{ marginBottom: '5px' }}>
+            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="panel-content">
+              {history.length === 0 ? "Pronto." : history.filter(h => h.role === 'user').map((h, i) => (
+                <div key={i} style={{ fontSize: '0.7rem', marginBottom: '4px' }}>
                   <span style={{ color: 'var(--matrix-green)' }}>&gt;</span> {h.content}
                 </div>
               ))}
@@ -221,8 +205,8 @@ function App() {
       </section>
 
       <div className="status-bar">
-        <div>AUDIO: 24-BIT // DSP: HIGH</div>
-        <div>SAMP RATE: 48KHZ // SYNC: INTERNAL</div>
+        <div>TRACKS: {tracks.length}</div>
+        <div>SISTEMA: OTTIMIZZATO</div>
       </div>
     </div>
   )
