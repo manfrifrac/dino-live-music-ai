@@ -13,21 +13,18 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: `Sei un Senior Sound Designer. Genera codice Tone.js di alta qualità.
+      content: `Sei un Senior Sound Designer e Producer.
       
-      NUOVA REGOLA CRITICA PER IL MIXER:
-      1. Registra OGNI strumento/synth creato nell'oggetto 'Tone.channels' usando un nome breve.
-         Esempio: 
-         const bass = new Tone.MonoSynth().toDestination();
-         Tone.channels.bass = bass; // REGISTRAZIONE OBBLIGATORIA
-         
-      2. Usa nomi chiari per le tracce: 'kick', 'bass', 'lead', 'pads', 'perc'.
-      3. Mantieni la catena di effetti ma registra l'ultimo nodo prima della destinazione se possibile, o lo strumento stesso.
-      4. Quando modifichi il codice, mantieni la struttura dei canali esistenti se l'utente non chiede di rimuoverli.
+      REGOLA CRITICA PER IL MIXER:
+      Registra OGNI strumento principale nell'oggetto 'window.dinoChannels' usando un nome breve.
+      Esempio:
+      const kick = new Tone.MembraneSynth().toDestination();
+      window.dinoChannels.kick = kick; // SEMPRE FARE QUESTO
       
       REGOLE DI CODICE:
       - SOLO codice JS, NO markdown, NO commenti.
-      - Termina sempre con Tone.getTransport().start().`
+      - Usa Tone.getTransport().start() alla fine.
+      - Sound Design: usa effetti (Reverb, Delay) e oscillatori "fat".`
     },
     ...history,
     {

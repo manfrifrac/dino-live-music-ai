@@ -2,30 +2,30 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Sparkles, Play, Square, ChevronDown, ChevronUp, 
-  Code2, Cpu, History, Volume2, VolumeX 
+  Play, Square, ChevronDown, ChevronUp, 
+  Code2, History, Volume2, VolumeX 
 } from 'lucide-react'
 import './App.css'
 
-// Estendiamo il tipo Tone per includere il nostro registro canali
-declare module 'tone' {
-  interface ToneStatic {
-    channels: { [key: string]: any };
+// Estendiamo l'oggetto window per i canali personalizzati
+declare global {
+  interface Window {
+    dinoChannels: { [key: string]: any };
   }
 }
 
 const DEFAULT_CODE = `// Dino-Live OS - Mixer Edition
-Tone.channels = {}; // Reset mixer
+window.dinoChannels = {}; // Reset mixer
 
 const masterReverb = new Tone.Reverb(2).toDestination();
 
 const kick = new Tone.MembraneSynth().toDestination();
-Tone.channels.kick = kick;
+window.dinoChannels.kick = kick;
 
 const lead = new Tone.PolySynth(Tone.MonoSynth, {
   oscillator: { type: "fatsawtooth" }
 }).connect(masterReverb);
-Tone.channels.lead = lead;
+window.dinoChannels.lead = lead;
 
 const loop = new Tone.Loop(t => {
   lead.triggerAttackRelease(["C3", "Eb3", "G3"], "4n", t);
@@ -62,8 +62,8 @@ function App() {
   }, [code, history]);
 
   const updateMixerUI = () => {
-    if (Tone.channels) {
-      setTracks(Object.keys(Tone.channels));
+    if (window.dinoChannels) {
+      setTracks(Object.keys(window.dinoChannels));
     }
   };
 
@@ -73,8 +73,8 @@ function App() {
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
       
-      // Pulizia canali precedenti
-      Tone.channels = {};
+      // Reset canali su window
+      window.dinoChannels = {};
       
       const func = new Function('Tone', codeToRun);
       func(Tone);
@@ -87,9 +87,9 @@ function App() {
   };
 
   const toggleMute = (trackName: string) => {
-    if (Tone.channels[trackName]) {
+    if (window.dinoChannels && window.dinoChannels[trackName]) {
       const isMuted = !mutedTracks[trackName];
-      Tone.channels[trackName].mute = isMuted;
+      window.dinoChannels[trackName].mute = isMuted;
       setMutedTracks(prev => ({ ...prev, [trackName]: isMuted }));
     }
   };
@@ -113,7 +113,10 @@ function App() {
       
       const data = await response.json();
       if (data.code) {
-        setHistory(prev => [...prev, { role: 'user', content: currentPrompt }, { role: 'assistant', content: "Mixer aggiornato." }].slice(-10));
+        const assistantMsg: Message = { role: 'assistant', content: "Mixer aggiornato." };
+        const userMsg: Message = { role: 'user', content: currentPrompt };
+        
+        setHistory(prev => [...prev, userMsg, assistantMsg].slice(-10));
         setCode(data.code);
         await executeCode(data.code);
       }
@@ -130,14 +133,13 @@ function App() {
         <div className="brand">DINO.MIXER</div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <div className={`dot ${isPlaying ? 'pulse' : ''}`} />
-          <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>DAW_MODE_ON</span>
+          <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>DAW_MODE</span>
         </div>
       </header>
 
-      {/* Dynamic Mixer */}
       <div className="mixer-container">
         {tracks.length === 0 ? (
-          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Nessuna traccia rilevata...</div>
+          <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Scansionando canali...</div>
         ) : (
           tracks.map(track => (
             <motion.div 
@@ -158,7 +160,7 @@ function App() {
         <div className="panel-content">
           <textarea
             className="main-prompt"
-            placeholder="Cosa vuoi aggiungere al mix? (es. 'Aggiungi un hi-hat in levare', 'Togli il basso')"
+            placeholder="Componi (es. 'Aggiungi hi-hat', 'Togli kick')"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
@@ -174,7 +176,7 @@ function App() {
 
       <section className="panel">
         <div className="panel-header" onClick={() => setIsCodeOpen(!isCodeOpen)}>
-          <div className="panel-title"><Code2 size={16} /> Console Sorgente</div>
+          <div className="panel-title"><Code2 size={16} /> Sorgente</div>
           {isCodeOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
         <AnimatePresence>
@@ -188,7 +190,7 @@ function App() {
 
       <section className="panel">
         <div className="panel-header" onClick={() => setIsHistoryOpen(!isHistoryOpen)}>
-          <div className="panel-title"><History size={16} /> Timeline Log</div>
+          <div className="panel-title"><History size={16} /> Sessione</div>
           {isHistoryOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
         <AnimatePresence>
@@ -206,7 +208,7 @@ function App() {
 
       <div className="status-bar">
         <div>TRACKS: {tracks.length}</div>
-        <div>SISTEMA: OTTIMIZZATO</div>
+        <div>AUDIO: 48KHZ</div>
       </div>
     </div>
   )
