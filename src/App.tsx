@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import * as Tone from 'tone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Play, Square, Zap, Activity, Sliders, Music, Mic, RotateCcw, AlertCircle
+  Play, Square, Zap, RotateCcw, AlertCircle, Power
 } from 'lucide-react'
 import './App.css'
 
@@ -45,16 +45,11 @@ function App() {
   const initEngine = async () => {
     try {
       await Tone.start();
-      
-      // Master Chain
       const limiter = new Tone.Limiter(-1).toDestination();
       const filter = new Tone.Filter(20000, "lowpass", -24).connect(limiter);
       const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.15 }).connect(filter);
-      
-      // Ducking (Sidechain) node
       const ducking = new Tone.Gain(1).connect(reverb);
       
-      // Instruments
       const kick = new Tone.MembraneSynth({ volume: 0 }).connect(filter);
       const snare = new Tone.NoiseSynth({ volume: -6, envelope: { attack: 0.001, decay: 0.2 } }).connect(reverb);
       const hihat = new Tone.MetalSynth({ volume: -12, envelope: { attack: 0.001, decay: 0.1 } }).connect(reverb);
@@ -66,11 +61,9 @@ function App() {
 
       nodes.current = { kick, snare, hihat, bass, filter, reverb, ducking };
 
-      // Sequence
       sequencer.current = new Tone.Sequence((time, step) => {
         setCurrentStep(step);
         const g = gridRef.current;
-        
         if (g.kick[step]) {
           nodes.current.kick.triggerAttackRelease("C1", "8n", time);
           nodes.current.ducking.gain.rampTo(0.1, 0.01, time);
@@ -83,7 +76,7 @@ function App() {
 
       setIsAudioStarted(true);
     } catch (e) {
-      setError("Inizializzazione fallita");
+      setError("Audio Init Fail");
     }
   };
 
@@ -124,11 +117,9 @@ function App() {
       if (data.newGrid) {
         setGrid(data.newGrid);
         setPrompt("");
-      } else {
-        setError("L'IA ha restituito dati non validi");
       }
     } catch (e) {
-      setError("Errore connessione IA");
+      setError("AI connection lost");
     } finally {
       setIsGenerating(false);
     }
@@ -141,8 +132,8 @@ function App() {
           <motion.div className="overlay" exit={{ opacity: 0 }} onClick={initEngine}>
             <div className="start-card">
               <Power size={50} />
-              <h2>DINO-LIVE CORE</h2>
-              <p>Inizializza Motore Audio v5.5</p>
+              <h2>DINO CORE v5.5</h2>
+              <p>Clicca per inizializzare</p>
             </div>
           </motion.div>
         )}
@@ -155,7 +146,6 @@ function App() {
         </button>
       </header>
 
-      {/* PERFORMANCE UNIT */}
       <section className="glass-panel">
         <div className="flex-row">
           <div className="fx-unit">
@@ -169,20 +159,17 @@ function App() {
         </div>
       </section>
 
-      {/* MINI SEQ VISUAL */}
       <div className="mini-seq">
         {Array(STEPS).fill(0).map((_, i) => (
           <div key={i} className={`mini-dot ${currentStep === i ? 'active' : ''} ${TRACKS.some(t => grid[t][i]) ? 'has-sound' : ''}`} />
         ))}
       </div>
 
-      {/* DRUM RACK */}
       <div className="pad-grid">
         <div className={`pad k ${activePad === 'kickC1' ? 'hit' : ''}`} onPointerDown={() => trigger('kick')}>KICK</div>
         <div className={`pad s ${activePad === 'snareC1' ? 'hit' : ''}`} onPointerDown={() => trigger('snare')}>SNARE</div>
         <div className={`pad h ${activePad === 'hihatC1' ? 'hit' : ''}`} onPointerDown={() => trigger('hihat')}>HIHAT</div>
         <div className="pad disabled">--</div>
-        
         {BASS_NOTES.map(n => (
           <div key={n} className={`pad b ${activePad === 'bass'+n ? 'hit' : ''}`} onPointerDown={() => trigger('bass', n)}>
             {n.replace('2', '')}
@@ -190,16 +177,10 @@ function App() {
         ))}
       </div>
 
-      {/* AI PILOT */}
       <footer className="ai-section">
         {error && <div className="err-msg"><AlertCircle size={12} /> {error}</div>}
         <div className="input-group">
-          <input 
-            placeholder="Comando Vibe (es. 'Techno dark')" 
-            value={prompt} 
-            onChange={e => setPrompt(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAI()}
-          />
+          <input placeholder="Prompt..." value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAI()} />
           <button onClick={handleAI} disabled={isGenerating}>
             {isGenerating ? <RotateCcw className="spin" size={16} /> : <Zap size={16} />}
           </button>
